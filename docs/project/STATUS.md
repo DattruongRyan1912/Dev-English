@@ -48,9 +48,10 @@ Overall state: **In progress — P0–P5 artifacts and local production-mode gat
 - [x] Verified the browser/API/PostgreSQL learning loops: diagnostic state, work-context/GitHub mission and vocabulary, writing evaluation/mistake memory/skill update, SRS review, roleplay and Copilot.
 - [x] Increased the Work Context client timeout to 90 seconds for provider-backed analysis and added an API-client regression test.
 - [x] Added a repeatable Chrome widget smoke for Home, Practice, Review and Progress and wired it into CI.
-- [x] P4 delivery controls are active: feature branch `chore/rc1-timeout-browser-smoke`, draft PR #1, passing GitHub `backend`/`flutter` checks, and protected `main`.
+- [x] P4 delivery controls are active: feature branch `chore/rc1-timeout-browser-smoke`, draft PR #1, passing GitHub `backend`/`flutter`/`production`/`postgres` checks, and protected `main`.
 - [x] Added PostgreSQL-backed `/readyz`, a production Flutter/Caddy image, hardened production Compose topology and a guarded production runbook.
 - [x] Ran a local production-mode container smoke: `/healthz`, `/readyz`, login, HttpOnly session lookup/logout and HTTPS-origin CORS passed.
+- [x] Added an opt-in PostgreSQL repository integration test and a disposable PostgreSQL CI job covering per-user isolation and the atomic writing outcome.
 
 ## In progress
 

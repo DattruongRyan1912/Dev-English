@@ -256,3 +256,16 @@ Checks:
 Boundary:
 
 - This is local production-mode evidence only. The real domain, DNS, certificate, production host/database, off-host backup and external logging still require operator-provided infrastructure.
+
+## 2026-08-23 — Disposable PostgreSQL repository regression
+
+Implemented:
+
+- Added opt-in `TestPostgresRepositoryIntegration`, enabled with `DEVENGLISH_TEST_DATABASE_URL` so the default unit suite remains database-free.
+- Added a GitHub Actions `postgres` job using disposable `pgvector/pg16`, applying all versioned migrations before the test.
+
+Verified locally against the running PostgreSQL/pgvector container:
+
+- `DEVENGLISH_TEST_DATABASE_URL=... go test ./backend/internal/store -run '^TestPostgresRepositoryIntegration$' -count=1` — passed.
+- The test verified per-user mission isolation, persisted mission completion, persisted mistake extraction, learning-state/skill update and cleanup of disposable users.
+- `go test ./...`, `go test -race ./...`, `go vet ./...`, `git diff --check` and shell syntax checks — passed.

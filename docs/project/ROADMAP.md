@@ -32,9 +32,10 @@ Status: **Done locally — text, SRS and browser voice loops verified against Po
 
 ## Phase 3 — Product hardening
 
-Status: **In progress — boundary controls, API smoke and Chrome smoke added**
+Status: **In progress — boundary controls, API/PostgreSQL smoke and Chrome smoke added**
 
 - Add automated API integration tests for the core learning loop.
+- Add a disposable PostgreSQL repository integration test for persistence, isolation and atomic writing outcomes.
 - Keep the writing outcome and PostgreSQL learning-state update atomic.
 - Add browser smoke tests for the four primary destinations. A repeatable Chrome smoke and API/database smoke are complete.
 - Improve loading, empty, provider-error and microphone-permission states. Speaking state labels and retry paths are now explicit; real permission/device evidence remains.
