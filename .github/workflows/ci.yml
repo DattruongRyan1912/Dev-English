@@ -15,7 +15,9 @@ jobs:
           go-version: '1.26.x'
       - run: gofmt -l backend | tee /tmp/gofmt.txt && test ! -s /tmp/gofmt.txt
       - run: go test ./...
+      - run: go test -race ./...
       - run: go vet ./...
+      - run: bash -n scripts/db_backup.sh scripts/db_migrate.sh scripts/db_restore.sh scripts/smoke_local.sh
       - run: go run ./backend/cmd/contentfactory --root . --write-evaluation-cases tests/evaluation_cases.generated.json --target 200
 
   flutter:
@@ -29,4 +31,5 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - run: flutter test --dart-define=DEVENGLISH_ENV=production
       - run: flutter build web --release

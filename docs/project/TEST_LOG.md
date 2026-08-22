@@ -172,3 +172,35 @@ Not yet proven:
 
 - The in-app browser microphone click did not transition from `Ready`; no permission prompt was accepted. A real Chrome/device permission test is still required.
 - Real HTTPS/domain/certificate deployment, production deployment and private GitHub import remain outside the local boundary.
+
+## 2026-08-23 — RC1 provider-backed API and PostgreSQL smoke
+
+Environment:
+
+- Docker backend and PostgreSQL/pgvector running locally with `.env.local` provider configuration.
+- Command: `DEVENGLISH_LIVE_SMOKE=YES scripts/smoke_local.sh`.
+- The script created one disposable authenticated user and removed it in an exit trap.
+
+Verified:
+
+- Diagnostic: 12 questions, CEFR `B2`, overall score `72`.
+- Daily mission → writing attempt: evaluation score `89.3`.
+- Work Context import generated vocabulary; Review submission persisted successfully.
+- Roleplay conversation and one provider-backed turn returned a reply.
+- Copilot returned `simple`, `natural` and `professional` outputs.
+- Public GitHub README import succeeded for `octocat/Spoon-Knife`; private repository provisioning was not attempted.
+- PostgreSQL counts for the disposable user included learning state, diagnostic result, missions, attempt, evaluation, work context, vocabulary, review, conversation and roleplay/Copilot AI usage rows.
+- Web Speaking capture now selects the `record_web`-supported PCM16 stream and wraps the raw samples in a 16 kHz mono WAV before STT/pronunciation upload.
+
+Additional checks:
+
+- `flutter analyze` — passed.
+- `flutter test` — passed (`3` tests, including Speaking controls/manual fallback and runtime guard flags).
+- `flutter test --dart-define=DEVENGLISH_ENV=production` — passed (`3` tests; production requires auth and disables demo fallback).
+- `bash -n scripts/db_backup.sh scripts/db_migrate.sh scripts/db_restore.sh scripts/smoke_local.sh` — passed.
+- Targeted production CORS tests — passed; HTTP origins, URL decorations, userinfo, wildcard and extra preflight headers are rejected or not advertised.
+
+Remaining:
+
+- Real browser microphone permission/capture and playback evidence.
+- Real HTTPS/domain/certificate deployment and production Postgres/auth/secret/backup/readiness verification.

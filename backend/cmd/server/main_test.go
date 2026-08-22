@@ -28,6 +28,16 @@ func TestValidateRuntimeConfigRequiresProductionBoundary(t *testing.T) {
 	if err := validateRuntimeConfig("production", manager, "postgres://db", []string{"https://app.example.com"}, "production-login-secret"); err != nil {
 		t.Fatalf("valid production config rejected: %v", err)
 	}
+	for _, origin := range []string{
+		"http://app.example.com",
+		"https://app.example.com/path",
+		"https://app.example.com?debug=true",
+		"https://user:password@app.example.com",
+	} {
+		if err := validateRuntimeConfig("production", manager, "postgres://db", []string{origin}, "production-login-secret"); err == nil {
+			t.Fatalf("production accepted unsafe CORS origin %q", origin)
+		}
+	}
 	t.Setenv("DEVENGLISH_SECRET_ENCRYPTION_KEY", "short")
 	if err := validateRuntimeConfig("production", manager, "postgres://db", []string{"https://app.example.com"}, "production-login-secret"); err == nil {
 		t.Fatal("production with a short secret-encryption key must be rejected")

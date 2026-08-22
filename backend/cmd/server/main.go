@@ -163,7 +163,7 @@ func validateRuntimeConfig(environment string, authManager *auth.Manager, databa
 	}
 	for _, origin := range allowedOrigins {
 		parsed, err := url.Parse(origin)
-		if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Path != "" || origin == "*" {
+		if err != nil || parsed.Host == "" || parsed.Scheme != "https" || parsed.Path != "" || parsed.RawQuery != "" || parsed.Fragment != "" || parsed.Opaque != "" || parsed.User != nil || origin == "*" {
 			return fmt.Errorf("invalid production CORS origin %q", origin)
 		}
 	}

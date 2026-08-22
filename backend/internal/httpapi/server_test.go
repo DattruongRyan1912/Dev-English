@@ -60,6 +60,25 @@ func TestConfiguredCORSRejectsUnknownOrigins(t *testing.T) {
 	}
 }
 
+func TestProductionCORSOnlyAdvertisesCookieHeaders(t *testing.T) {
+	memory := store.NewSeeded(time.Now().UTC())
+	service := learning.NewService(memory, ai.DeterministicProvider{})
+	server := NewServer(service, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	server.StrictAuth = true
+	server.AllowedOrigins = []string{"https://app.example.com"}
+	request := httptest.NewRequest(http.MethodOptions, "/api/v1/home", nil)
+	request.Header.Set("Origin", "https://app.example.com")
+	request.Header.Set("Access-Control-Request-Headers", "content-type, x-bootstrap-key")
+	response := httptest.NewRecorder()
+	server.Handler().ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("production preflight returned %d, want 204", response.Code)
+	}
+	if got := response.Header().Get("Access-Control-Allow-Headers"); got != "Content-Type" {
+		t.Fatalf("production preflight advertised %q, want Content-Type only", got)
+	}
+}
+
 func TestDevelopmentCORSSupportsCredentialedBrowserOrigin(t *testing.T) {
 	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	request.Header.Set("Origin", "http://localhost:8093")

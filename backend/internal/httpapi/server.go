@@ -90,7 +90,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/missions/daily", s.createDailyMission)
 	mux.HandleFunc("POST /api/v1/work-context", s.workContext)
 	mux.HandleFunc("POST /api/v1/missions/", s.missionAction)
-	return withCORS(withRequestLog(s.withAuth(mux), s.Logger), s.AllowedOrigins)
+	return withCORS(withRequestLog(s.withAuth(mux), s.Logger), s.AllowedOrigins, s.StrictAuth)
 }
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
@@ -799,12 +799,18 @@ func (s *Server) missionAction(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
+func withCORS(next http.Handler, allowedOrigins []string, strictAuth bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := strings.TrimSpace(r.Header.Get("Origin"))
 		if len(allowedOrigins) == 0 {
+			if strictAuth && origin != "" {
+				writeError(w, http.StatusForbidden, errors.New("production CORS allowlist is not configured"))
+				return
+			}
 			if origin == "" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
+				if !strictAuth {
+					w.Header().Set("Access-Control-Allow-Origin", "*")
+				}
 			} else {
 				// Development keeps the local Flutter browser flow convenient. Production
 				// always supplies an explicit allowlist before the server starts.
@@ -822,7 +828,11 @@ func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 			}
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Bootstrap-Key")
+		allowedHeaders := "Content-Type"
+		if !strictAuth {
+			allowedHeaders += ", Authorization, X-Bootstrap-Key"
+		}
+		w.Header().Set("Access-Control-Allow-Headers", allowedHeaders)
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)

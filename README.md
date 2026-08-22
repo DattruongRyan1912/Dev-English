@@ -121,6 +121,12 @@ The backend is available at `http://localhost:8080`. Inside Compose, it connects
 flutter run -d chrome --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://localhost:8080
 ```
 
+Run the repeatable local RC1 API/database smoke only when provider usage is intended. It creates a disposable authenticated user, exercises the core learning loop, roleplay, Copilot and public GitHub import, checks PostgreSQL rows, then removes that user:
+
+```bash
+DEVENGLISH_LIVE_SMOKE=YES scripts/smoke_local.sh
+```
+
 Stop the local stack with `docker compose --env-file .env.local -f infra/docker-compose.yml down`. This stops and removes the containers but keeps the named PostgreSQL volume.
 
 ### Migrations and database recovery
@@ -210,10 +216,12 @@ The factory validates duplicates, required catalogs and structured evaluation fi
 ```bash
 gofmt -w backend
 go test ./...
+go test -race ./...
 go vet ./...
 dart format lib test
 flutter analyze
 flutter test
+flutter test --dart-define=DEVENGLISH_ENV=production
 flutter build web --release
 ```
 

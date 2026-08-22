@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 
@@ -21,13 +23,16 @@ class _SpeakingScreenState extends State<SpeakingScreen> {
   final AudioRecorder _recorder = AudioRecorder();
   final TextEditingController _transcriptController = TextEditingController();
   StreamSubscription<Uint8List>? _recordingSubscription;
+  AudioPlayer? _player;
   final List<int> _audio = <int>[];
   bool _recording = false;
+  bool _playing = false;
   String _state = 'Ready';
 
   @override
   void dispose() {
     _recordingSubscription?.cancel();
+    _player?.dispose();
     _recorder.dispose();
     _transcriptController.dispose();
     super.dispose();
@@ -103,6 +108,9 @@ class _SpeakingScreenState extends State<SpeakingScreen> {
                   _SessionResult(
                     session: widget.controller.speakingSession!,
                     onAssess: _assess,
+                    canAssess: _audio.isNotEmpty,
+                    onPlay: _playFeedback,
+                    playing: _playing,
                   ),
                 ],
                 if (widget.controller.error != null) ...[
@@ -126,40 +134,71 @@ class _SpeakingScreenState extends State<SpeakingScreen> {
     if (_recording) {
       setState(() {
         _recording = false;
-        _state = 'Processing';
+        _state = 'Uploading';
       });
-      await _recorder.stop();
-      await _recordingSubscription?.cancel();
-      _recordingSubscription = null;
-      if (_audio.isEmpty) {
-        setState(() => _state = 'Error');
+      try {
+        await _recorder.stop().timeout(const Duration(seconds: 10));
+        await _recordingSubscription?.cancel();
+        _recordingSubscription = null;
+      } catch (_) {
+        if (mounted) {
+          setState(() => _state = 'Provider/network failure — Retry');
+        }
         return;
       }
-      await widget.controller.transcribeAudio(_audio, 'audio/webm');
+      if (_audio.isEmpty) {
+        setState(() => _state = 'Recording failed — Retry');
+        return;
+      }
+      if (mounted) setState(() => _state = 'Transcribing');
+      await widget.controller.transcribeAudio(
+        _audioForUpload(),
+        _audioMimeType,
+      );
       if (!mounted) return;
-      setState(() => _state = 'Result');
+      setState(
+        () => _state = widget.controller.error == null
+            ? 'Success — transcript ready'
+            : 'Provider/network failure — Retry',
+      );
       final transcript = widget.controller.speakingSession?.transcript;
       if (transcript != null && transcript.isNotEmpty) {
         _transcriptController.text = transcript;
       }
       return;
     }
-    final allowed = await _recorder.hasPermission();
+    setState(() => _state = 'Requesting microphone permission');
+    bool allowed;
+    try {
+      allowed = await _recorder.hasPermission().timeout(
+        const Duration(seconds: 10),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _state = 'Permission request failed — Retry');
+      return;
+    }
     if (!allowed) {
-      setState(() => _state = 'Error');
+      setState(() => _state = 'Permission denied — Retry');
       return;
     }
     _audio.clear();
-    final stream = await _recorder.startStream(
-      const RecordConfig(
-        encoder: AudioEncoder.opus,
-        sampleRate: 16000,
-        numChannels: 1,
-        echoCancel: true,
-        noiseSuppress: true,
-      ),
-    );
-    _recordingSubscription = stream.listen(_audio.addAll);
+    try {
+      final stream = await _recorder
+          .startStream(
+            const RecordConfig(
+              encoder: kIsWeb ? AudioEncoder.pcm16bits : AudioEncoder.opus,
+              sampleRate: 16000,
+              numChannels: 1,
+              echoCancel: true,
+              noiseSuppress: true,
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
+      _recordingSubscription = stream.listen(_audio.addAll);
+    } catch (_) {
+      if (mounted) setState(() => _state = 'Provider/network failure — Retry');
+      return;
+    }
     if (mounted) {
       setState(() {
         _recording = true;
@@ -170,20 +209,97 @@ class _SpeakingScreenState extends State<SpeakingScreen> {
 
   Future<void> _saveManualTranscript() async {
     if (_transcriptController.text.trim().isEmpty) return;
-    setState(() => _state = 'Processing');
+    setState(() => _state = 'Saving transcript');
     await widget.controller.saveTranscript(_transcriptController.text);
-    if (mounted) setState(() => _state = 'Result');
+    if (mounted) {
+      setState(
+        () => _state = widget.controller.error == null
+            ? 'Success — transcript saved'
+            : 'Provider/network failure — Retry',
+      );
+    }
   }
 
   Future<void> _assess() async {
     if (_audio.isEmpty) return;
-    setState(() => _state = 'Evaluating');
+    setState(() => _state = 'Assessing pronunciation');
     await widget.controller.assessSpeaking(
-      _audio,
-      'audio/webm',
+      _audioForUpload(),
+      _audioMimeType,
       _transcriptController.text,
     );
-    if (mounted) setState(() => _state = 'Result');
+    if (mounted) {
+      setState(
+        () => _state = widget.controller.error == null
+            ? 'Success — pronunciation assessed'
+            : 'Provider/network failure — Retry',
+      );
+    }
+  }
+
+  Future<void> _playFeedback() async {
+    final session = widget.controller.speakingSession;
+    if (session == null || _playing) return;
+    setState(() => _state = 'Synthesizing feedback');
+    final pronunciation = session.pronunciation;
+    final text = pronunciation == null
+        ? session.transcript
+        : 'Your pronunciation score is ${pronunciation.score.round()} percent. '
+              'Accuracy ${pronunciation.accuracy.round()} percent. '
+              'Fluency ${pronunciation.fluency.round()} percent. '
+              'Completeness ${pronunciation.completeness.round()} percent. '
+              'Prosody ${pronunciation.prosody.round()} percent.';
+    final bytes = await widget.controller.synthesize(text);
+    if (!mounted) return;
+    if (bytes == null || bytes.isEmpty) {
+      setState(() => _state = 'Provider/network failure — Retry');
+      return;
+    }
+    final player = _player ??= AudioPlayer();
+    try {
+      setState(() {
+        _playing = true;
+        _state = 'Playing feedback';
+      });
+      await player.play(BytesSource(Uint8List.fromList(bytes)));
+      await player.onPlayerComplete.first;
+      if (mounted) setState(() => _state = 'Success — feedback played');
+    } catch (_) {
+      if (mounted) setState(() => _state = 'Provider/network failure — Retry');
+    } finally {
+      if (mounted) setState(() => _playing = false);
+    }
+  }
+
+  String get _audioMimeType => kIsWeb ? 'audio/wav' : 'audio/webm';
+
+  List<int> _audioForUpload() {
+    if (!kIsWeb) return List<int>.from(_audio);
+
+    final pcm = Uint8List.fromList(_audio);
+    final wav = ByteData(44 + pcm.length);
+    _writeAscii(wav, 0, 'RIFF');
+    wav.setUint32(4, 36 + pcm.length, Endian.little);
+    _writeAscii(wav, 8, 'WAVE');
+    _writeAscii(wav, 12, 'fmt ');
+    wav.setUint32(16, 16, Endian.little);
+    wav.setUint16(20, 1, Endian.little);
+    wav.setUint16(22, 1, Endian.little);
+    wav.setUint32(24, 16000, Endian.little);
+    wav.setUint32(28, 32000, Endian.little);
+    wav.setUint16(32, 2, Endian.little);
+    wav.setUint16(34, 16, Endian.little);
+    _writeAscii(wav, 36, 'data');
+    wav.setUint32(40, pcm.length, Endian.little);
+    final result = wav.buffer.asUint8List();
+    result.setRange(44, result.length, pcm);
+    return result;
+  }
+}
+
+void _writeAscii(ByteData data, int offset, String value) {
+  for (var index = 0; index < value.length; index++) {
+    data.setUint8(offset + index, value.codeUnitAt(index));
   }
 }
 
@@ -217,10 +333,19 @@ class _StateBanner extends StatelessWidget {
 }
 
 class _SessionResult extends StatelessWidget {
-  const _SessionResult({required this.session, required this.onAssess});
+  const _SessionResult({
+    required this.session,
+    required this.onAssess,
+    required this.canAssess,
+    required this.onPlay,
+    required this.playing,
+  });
 
   final SpeakingSession session;
   final VoidCallback onAssess;
+  final bool canAssess;
+  final VoidCallback onPlay;
+  final bool playing;
 
   @override
   Widget build(BuildContext context) {
@@ -238,9 +363,15 @@ class _SessionResult extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyLarge,
             ),
             const SizedBox(height: AppSpacing.lg),
+            OutlinedButton.icon(
+              onPressed: playing ? null : onPlay,
+              icon: Icon(playing ? Icons.volume_up : Icons.play_arrow),
+              label: Text(playing ? 'Playing feedback…' : 'Play feedback'),
+            ),
+            const SizedBox(height: AppSpacing.md),
             if (pronunciation == null)
               OutlinedButton.icon(
-                onPressed: onAssess,
+                onPressed: canAssess ? onAssess : null,
                 icon: const Icon(Icons.assessment_outlined),
                 label: const Text('Assess pronunciation'),
               )

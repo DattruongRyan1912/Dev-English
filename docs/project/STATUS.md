@@ -41,13 +41,17 @@ Overall state: **In progress — local RC1 hardening is implemented and runtime-
 - [x] Verified live capability probes for DeepSeek, Groq Whisper, Azure Pronunciation and Azure Neural TTS.
 - [x] Verified the live PostgreSQL learning loop, one roleplay turn and one Copilot request.
 - [x] Manually smoke-tested browser rendering and navigation for Home, Practice, Review, Progress and Settings.
+- [x] Added a repeatable provider-backed API/PostgreSQL smoke script covering diagnostic, mission/writing, work import, review, roleplay, Copilot and public GitHub import; the disposable user is cleaned up automatically.
+- [x] Added explicit Speaking permission, recording, upload, transcription, assessment, TTS playback, success and retry state labels plus a Flutter widget regression test; web capture uses PCM16 streaming wrapped as WAV for Groq/Azure.
+- [x] Hardened production CORS to HTTPS-only explicit origins, credentialed cookies and a minimal preflight header allowlist; targeted Go tests pass.
 
 ## In progress
 
 - [ ] Complete the browser microphone leg of speaking: the Speaking screen renders, but microphone capture/permission did not transition under the in-app browser.
 - [ ] Complete the browser microphone leg of speaking with a real Chrome/device permission test.
 - [ ] Exercise the new login/logout flow against a real HTTPS deployment; local HTTP cannot validate a `Secure` cookie.
-- [ ] Add repeatable automated browser/API smoke coverage for the core learning loop.
+- [x] Add repeatable automated API/PostgreSQL smoke coverage for the core learning loop.
+- [ ] Add repeatable automated browser smoke coverage for the core learning loop.
 - [ ] Verify the private GitHub import path after a GitHub token and repository access are deliberately provisioned.
 - [ ] Complete the remaining P0 production checks: real HTTPS deployment and browser microphone evidence.
 
