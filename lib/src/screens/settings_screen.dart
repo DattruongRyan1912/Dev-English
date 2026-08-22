@@ -20,6 +20,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     widget.controller.loadSettingsData();
   }
 
+  Future<void> _signOut() async {
+    await widget.controller.logout();
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: AppColors.background,
@@ -141,6 +147,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
               ),
             ),
+            if (widget.controller.requiresAuthentication) ...[
+              const SizedBox(height: AppSpacing.md),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: OutlinedButton.icon(
+                    onPressed: widget.controller.authenticating
+                        ? null
+                        : _signOut,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sign out'),
+                  ),
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
             if (widget.controller.usageSummary != null)
               Card(

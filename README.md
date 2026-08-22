@@ -32,7 +32,7 @@ Project tracking is maintained in [`docs/project/`](docs/project/README.md). Sta
 - Usage/cost records, configurable monthly budget and a hard 300,000 VND ceiling.
 - Personal vocabulary graph, seven-day learning analytics and weekly speaking assessment recommendations.
 - Provider connection status endpoint for DeepSeek, Groq Whisper and Azure speech capabilities with authenticated health probes, without exposing secrets.
-- HMAC bearer-session middleware, per-user repository scoping and authenticated data export/deletion boundary.
+- HMAC token verification, HttpOnly web sessions, per-user repository scoping and authenticated data export/deletion boundary.
 - PostgreSQL/pgvector migration with tables for users, learning state, missions, attempts, evaluations, mistakes, vocabulary, conversations, speaking sessions, imported work and AI usage.
 
 ### Flutter client
@@ -40,7 +40,7 @@ Project tracking is maintained in [`docs/project/`](docs/project/README.md). Sta
 - Mobile-first light design system with focus mode and four bottom destinations: Home, Practice, Review and Progress.
 - Onboarding diagnostic, daily writing mission, feedback/retry, work/GitHub import, speaking recorder/transcript fallback, roleplay simulators, Copilot, vocabulary graph, SRS review, analytics and provider settings views.
 - `record` microphone streaming and `audioplayers` TTS playback are wired behind the backend API.
-- API keys are not stored in the client. `API_TOKEN` is optional for authenticated deployments.
+- Provider API keys and authentication secrets are never stored in the client. Production web access uses a server-issued HttpOnly session cookie.
 
 ### Content factory
 
@@ -74,7 +74,7 @@ The migration is mounted into the database container. The production boundary ex
 
 ```bash
 export DEVENGLISH_ENV="development"
-export DEVENGLISH_ALLOWED_ORIGINS=""
+export DEVENGLISH_ALLOWED_ORIGINS="http://localhost:8093"
 export DEEPSEEK_API_KEY="..."
 export DEEPSEEK_FAST_MODEL="deepseek-v4-flash"
 export DEEPSEEK_SMART_MODEL="deepseek-v4-pro"
@@ -94,12 +94,13 @@ Set a random secret of at least 32 characters:
 
 ```bash
 export DEVENGLISH_AUTH_SECRET="a-long-random-secret-at-least-32-characters"
-export DEVENGLISH_BOOTSTRAP_KEY="local-bootstrap-key"
+export DEVENGLISH_BOOTSTRAP_KEY="local-bootstrap-key" # development/API tooling only
+export DEVENGLISH_LOGIN_SECRET="a-random-production-login-secret"
 ```
 
-Create a local session with `POST /api/v1/auth/session`, then send `Authorization: Bearer <token>`. The Flutter client can receive a pre-issued token with `--dart-define=API_TOKEN=...`.
+For development/API tooling, create a bearer session with `POST /api/v1/auth/session` and send `Authorization: Bearer <token>`. The Flutter client does not embed that token or the bootstrap key; development mode allows the local single-user flow without a client secret.
 
-For a production process, set `DEVENGLISH_ENV=production`, provide `DATABASE_URL`, a 32+ character `DEVENGLISH_AUTH_SECRET`, a non-empty `DEVENGLISH_BOOTSTRAP_KEY`, and a comma-separated `DEVENGLISH_ALLOWED_ORIGINS` allowlist. Production does not seed demo data, does not use deterministic AI fallback, and rejects startup when this boundary is incomplete.
+For a production process, set `DEVENGLISH_ENV=production`, provide `DATABASE_URL`, a 32+ character `DEVENGLISH_AUTH_SECRET`, a 16+ character `DEVENGLISH_LOGIN_SECRET`, and a comma-separated `DEVENGLISH_ALLOWED_ORIGINS` allowlist. The browser signs in through `POST /api/v1/auth/login`; the backend returns a `Secure`, `HttpOnly`, `SameSite=Strict` cookie and never returns a bearer token to the browser. `DEVENGLISH_BOOTSTRAP_KEY` is not a production browser credential and must never be compiled into Flutter. Production does not seed demo data, does not use deterministic AI fallback, and rejects startup when this boundary is incomplete.
 
 ### Local Docker development
 
@@ -159,7 +160,9 @@ In development, an unavailable backend enables an inspectable demo state for UI 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/healthz` | Service/provider health |
-| POST | `/api/v1/auth/session` | Create a development bearer session |
+| POST | `/api/v1/auth/session` | Create a development/API-tooling bearer session |
+| POST | `/api/v1/auth/login` | Create the production HttpOnly browser session |
+| POST | `/api/v1/auth/logout` | Revoke and clear the production browser session |
 | GET | `/api/v1/auth/me` | Current authenticated user |
 | GET | `/api/v1/home` | Mission, learning state and due count |
 | GET | `/api/v1/practice` | Practice launcher |

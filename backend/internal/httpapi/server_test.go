@@ -45,7 +45,9 @@ func TestConfiguredCORSRejectsUnknownOrigins(t *testing.T) {
 	allowed.Header.Set("Origin", "https://app.example.com")
 	allowedResponse := httptest.NewRecorder()
 	handler.ServeHTTP(allowedResponse, allowed)
-	if allowedResponse.Code != http.StatusOK || allowedResponse.Header().Get("Access-Control-Allow-Origin") != "https://app.example.com" {
+	if allowedResponse.Code != http.StatusOK ||
+		allowedResponse.Header().Get("Access-Control-Allow-Origin") != "https://app.example.com" ||
+		allowedResponse.Header().Get("Access-Control-Allow-Credentials") != "true" {
 		t.Fatalf("allowed origin was not accepted: %d %q", allowedResponse.Code, allowedResponse.Header().Get("Access-Control-Allow-Origin"))
 	}
 
@@ -55,6 +57,20 @@ func TestConfiguredCORSRejectsUnknownOrigins(t *testing.T) {
 	handler.ServeHTTP(deniedResponse, denied)
 	if deniedResponse.Code != http.StatusForbidden {
 		t.Fatalf("unknown origin returned %d, want 403", deniedResponse.Code)
+	}
+}
+
+func TestDevelopmentCORSSupportsCredentialedBrowserOrigin(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	request.Header.Set("Origin", "http://localhost:8093")
+	response := httptest.NewRecorder()
+	testServer().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("development health returned %d", response.Code)
+	}
+	if response.Header().Get("Access-Control-Allow-Origin") != "http://localhost:8093" ||
+		response.Header().Get("Access-Control-Allow-Credentials") != "true" {
+		t.Fatalf("development CORS did not support credentials: %v", response.Header())
 	}
 }
 

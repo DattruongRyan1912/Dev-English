@@ -2,22 +2,43 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import 'http_client.dart';
 import 'models.dart';
+
+class AuthRequiredException implements Exception {
+  const AuthRequiredException([this.message = 'Authentication is required.']);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 class DevEnglishApi {
   DevEnglishApi({http.Client? client, String? baseUrl})
-    : _client = client ?? http.Client(),
+    : _client = client ?? createHttpClient(),
       baseUrl =
           baseUrl ??
           const String.fromEnvironment(
             'API_BASE_URL',
             defaultValue: 'http://localhost:8080',
-          ),
-      _token = const String.fromEnvironment('API_TOKEN');
+          );
 
   final http.Client _client;
   final String baseUrl;
-  final String _token;
+  void Function()? onUnauthorized;
+
+  Future<AuthUser> currentUser() async =>
+      AuthUser.fromJson(await _get('/api/v1/auth/me'));
+
+  Future<AuthUser> login(String secret) async {
+    final json = await _post('/api/v1/auth/login', {'secret': secret});
+    return AuthUser.fromJson(_map(json['user']));
+  }
+
+  Future<void> logout() async {
+    await _post('/api/v1/auth/logout', <String, dynamic>{});
+  }
 
   Future<HomeData> home() async => HomeData.fromJson(
     await _get('/api/v1/home', timeout: const Duration(seconds: 30)),
@@ -129,6 +150,10 @@ class DevEnglishApi {
         )
         .timeout(const Duration(seconds: 30));
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401) {
+        onUnauthorized?.call();
+        throw const AuthRequiredException('Authentication is required.');
+      }
       throw Exception('TTS request failed');
     }
     return response.bodyBytes;
@@ -270,17 +295,21 @@ class DevEnglishApi {
         ? <String, dynamic>{}
         : jsonDecode(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception(_map(decoded)['error']?.toString() ?? 'Request failed');
+      final rawError = _map(decoded)['error'];
+      final message = rawError is Map
+          ? rawError['message']?.toString() ?? 'Request failed'
+          : rawError?.toString() ?? 'Request failed';
+      if (response.statusCode == 401) {
+        onUnauthorized?.call();
+        throw AuthRequiredException(message);
+      }
+      throw Exception(message);
     }
     return _map(decoded);
   }
 
   Map<String, String> _headers([Map<String, String>? initial]) {
-    final headers = <String, String>{...?initial};
-    if (_token.isNotEmpty) {
-      headers['authorization'] = 'Bearer $_token';
-    }
-    return headers;
+    return <String, String>{...?initial};
   }
 }
 

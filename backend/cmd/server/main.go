@@ -28,7 +28,8 @@ func main() {
 	authManager := auth.NewFromEnv()
 	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	allowedOrigins := parseAllowedOrigins(os.Getenv("DEVENGLISH_ALLOWED_ORIGINS"))
-	if err := validateRuntimeConfig(environment, authManager, databaseURL, allowedOrigins); err != nil {
+	loginSecret := strings.TrimSpace(os.Getenv("DEVENGLISH_LOGIN_SECRET"))
+	if err := validateRuntimeConfig(environment, authManager, databaseURL, allowedOrigins, loginSecret); err != nil {
 		logger.Error("invalid runtime configuration", "error", err, "environment", environment)
 		os.Exit(1)
 	}
@@ -71,6 +72,7 @@ func main() {
 	api := httpapi.NewServer(service, logger, authManager)
 	api.StrictAuth = production
 	api.AllowedOrigins = allowedOrigins
+	api.LoginSecret = loginSecret
 	server := &http.Server{Addr: ":" + strconv.Itoa(port), Handler: api.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 120 * time.Second, WriteTimeout: 120 * time.Second, IdleTimeout: 60 * time.Second}
 
 	stop := make(chan os.Signal, 1)
@@ -110,7 +112,7 @@ func parseAllowedOrigins(raw string) []string {
 	return origins
 }
 
-func validateRuntimeConfig(environment string, authManager *auth.Manager, databaseURL string, allowedOrigins []string) error {
+func validateRuntimeConfig(environment string, authManager *auth.Manager, databaseURL string, allowedOrigins []string, loginSecret string) error {
 	switch environment {
 	case "development", "test", "staging", "production":
 	default:
@@ -122,8 +124,8 @@ func validateRuntimeConfig(environment string, authManager *auth.Manager, databa
 	if authManager == nil || !authManager.Enabled() {
 		return fmt.Errorf("DEVENGLISH_AUTH_SECRET must be at least 32 characters in production")
 	}
-	if strings.TrimSpace(os.Getenv("DEVENGLISH_BOOTSTRAP_KEY")) == "" {
-		return fmt.Errorf("DEVENGLISH_BOOTSTRAP_KEY is required in production")
+	if len(loginSecret) < 16 {
+		return fmt.Errorf("DEVENGLISH_LOGIN_SECRET must be at least 16 characters in production")
 	}
 	if databaseURL == "" {
 		return fmt.Errorf("DATABASE_URL is required in production")

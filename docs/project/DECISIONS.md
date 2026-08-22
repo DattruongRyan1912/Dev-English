@@ -38,7 +38,7 @@ Date: 2026-08-22
 
 Date: 2026-08-22
 
-`DEVENGLISH_ENV=production` is a separate runtime boundary. It requires PostgreSQL, bearer-auth and bootstrap secrets, and an explicit CORS origin allowlist. It does not seed demo data and never silently replaces a failed primary AI request with deterministic output. Development keeps the deterministic fallback for local UI work.
+`DEVENGLISH_ENV=production` is a separate runtime boundary. It requires PostgreSQL, a 32+ character signing secret, a 16+ character login secret and an explicit CORS origin allowlist. The browser uses a server-issued `Secure`, `HttpOnly`, `SameSite=Strict` session cookie; bootstrap credentials remain development/API-tooling only and are never compiled into Flutter. It does not seed demo data and never silently replaces a failed primary AI request with deterministic output. Development keeps the deterministic fallback for local UI work.
 
 ## D-006 — Metrics need persisted evidence
 

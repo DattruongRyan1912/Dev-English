@@ -7,13 +7,18 @@ import 'models.dart';
 const bool _allowDemoFallback =
     String.fromEnvironment('DEVENGLISH_ENV', defaultValue: 'development') !=
     'production';
+const bool _requiresAuthentication =
+    String.fromEnvironment('DEVENGLISH_ENV', defaultValue: 'development') ==
+    'production';
 const VocabularyGraph _emptyVocabularyGraph = VocabularyGraph(
   nodes: [],
   edges: [],
 );
 
 class AppController extends ChangeNotifier {
-  AppController({DevEnglishApi? api}) : _api = api ?? DevEnglishApi();
+  AppController({DevEnglishApi? api}) : _api = api ?? DevEnglishApi() {
+    _api.onUnauthorized = _handleUnauthorized;
+  }
 
   final DevEnglishApi _api;
   HomeData _home = DemoData.home;
@@ -42,6 +47,11 @@ class AppController extends ChangeNotifier {
   List<ProviderCheck> _providerChecks = DemoData.providerChecks;
   SpeakingSession? _speakingSession;
   bool _working = false;
+  bool _authenticated = !_requiresAuthentication;
+  bool _authLoading = _requiresAuthentication;
+  bool _authenticating = false;
+  String? _authError;
+  AuthUser? _authUser;
 
   HomeData get home => _home;
   List<PracticeMode> get practice => _practice;
@@ -70,11 +80,36 @@ class AppController extends ChangeNotifier {
   List<ProviderCheck> get providerChecks => _providerChecks;
   SpeakingSession? get speakingSession => _speakingSession;
   bool get working => _working;
+  bool get requiresAuthentication => _requiresAuthentication;
+  bool get authenticated => _authenticated;
+  bool get authLoading => _authLoading;
+  bool get authenticating => _authenticating;
+  String? get authError => _authError;
+  AuthUser? get authUser => _authUser;
 
   Future<void> load() async {
     _loading = true;
     _error = null;
     notifyListeners();
+    if (_requiresAuthentication && !_authenticated) {
+      _authLoading = true;
+      try {
+        _authUser = await _api.currentUser();
+        _authenticated = true;
+        _authError = null;
+      } catch (error) {
+        if (error is! AuthRequiredException) {
+          _authError = 'Không thể kiểm tra phiên đăng nhập. Hãy thử lại.';
+        }
+      } finally {
+        _authLoading = false;
+      }
+      if (!_authenticated) {
+        _loading = false;
+        notifyListeners();
+        return;
+      }
+    }
     try {
       final results = await Future.wait<dynamic>([
         _api.home(),
@@ -117,6 +152,53 @@ class AppController extends ChangeNotifier {
       _loading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> login(String secret) async {
+    _authenticating = true;
+    _authError = null;
+    notifyListeners();
+    try {
+      _authUser = await _api.login(secret.trim());
+      _authenticated = true;
+      await load();
+    } catch (error) {
+      _authenticated = false;
+      _authUser = null;
+      _authError = error is AuthRequiredException
+          ? 'Mã đăng nhập không đúng.'
+          : 'Không thể đăng nhập. Hãy kiểm tra backend và thử lại.';
+    } finally {
+      _authenticating = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> logout() async {
+    _authenticating = true;
+    notifyListeners();
+    try {
+      await _api.logout();
+    } catch (_) {
+      _authError = 'Không thể xác nhận đăng xuất với backend.';
+    } finally {
+      _authenticated = false;
+      _authUser = null;
+      _authenticating = false;
+      _loading = false;
+      _usingDemo = true;
+      notifyListeners();
+    }
+  }
+
+  void _handleUnauthorized() {
+    if (!_requiresAuthentication || !_authenticated) return;
+    _authenticated = false;
+    _authUser = null;
+    _authLoading = false;
+    _authError = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
+    _loading = false;
+    notifyListeners();
   }
 
   Future<void> submitWriting(String missionId, String answer) async {

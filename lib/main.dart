@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'src/app_controller.dart';
 import 'src/screens/focus_screen.dart';
 import 'src/screens/home_screen.dart';
+import 'src/screens/login_screen.dart';
 import 'src/screens/practice_screen.dart';
 import 'src/screens/progress_screen.dart';
 import 'src/screens/review_screen.dart';
@@ -70,6 +71,10 @@ class _AppShellState extends State<_AppShell> {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
+        }
+        if (widget.controller.requiresAuthentication &&
+            !widget.controller.authenticated) {
+          return LoginScreen(controller: widget.controller);
         }
         if (widget.controller.usingDemo &&
             !widget.controller.demoFallbackEnabled) {

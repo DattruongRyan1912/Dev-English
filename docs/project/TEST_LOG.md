@@ -31,7 +31,7 @@ Remaining evidence:
 
 Implemented and statically verified:
 
-- Production rejects missing `DATABASE_URL`, auth secret, bootstrap key or CORS allowlist.
+- Production rejects missing `DATABASE_URL`, auth secret, login secret or CORS allowlist.
 - Production skips local demo seeding and disables deterministic AI fallback.
 - Configured CORS rejects origins outside the explicit allowlist.
 - `/api/v1/settings/test` now performs authenticated provider probes instead of reporting configuration only.
@@ -48,6 +48,32 @@ Not yet proven in this batch:
 - Production process startup with real secrets and PostgreSQL.
 - Live provider probe responses with the configured DeepSeek/Groq/Azure credentials.
 - HTTPS deployment.
+
+## 2026-08-23 — P0.1 production web authentication
+
+Implementation and verification boundary:
+
+- Removed the Flutter `API_TOKEN` compile-time path. The client now uses the browser credentialed HTTP client and never receives `DEVENGLISH_BOOTSTRAP_KEY`.
+- Added `POST /api/v1/auth/login` with a server-side `DEVENGLISH_LOGIN_SECRET`; successful login sets a `Secure`, `HttpOnly`, `SameSite=Strict` cookie without returning a bearer token.
+- Added `POST /api/v1/auth/logout`, server-side session revocation, session restore through `/api/v1/auth/me`, and an expiry/401 transition back to the login screen.
+- Kept `POST /api/v1/auth/session` explicitly development/API-tooling-only; production returns `404` for that bootstrap route.
+- Configured CORS credentials only for an explicit origin allowlist.
+
+Checks:
+
+- `go test ./...` — passed after adding anonymous rejection, cookie login, reload, logout revocation and production bootstrap-route tests.
+- `go vet ./...` — passed.
+- `flutter analyze` — passed.
+- `flutter test` — passed.
+- `go test -race ./internal/httpapi` — passed.
+- `flutter build web --release --dart-define=DEVENGLISH_ENV=production --dart-define=API_BASE_URL=https://app.example.com` — passed; the resulting `build/web` artifact contained no `API_TOKEN`, `DEVENGLISH_BOOTSTRAP_KEY` or login-secret marker.
+- `flutter build web --release --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://localhost:8080` — passed.
+- `docker compose --env-file .env.local -f infra/docker-compose.yml up -d --build` — passed; `GET /healthz` returned `200` and unauthenticated development `GET /api/v1/home` returned `200` without a client bearer token.
+
+Not yet proven in this batch:
+
+- Real browser login over HTTPS with a deployed certificate and domain; `Secure` cookie behavior still belongs to the P0.5 HTTPS verification gate.
+- Multi-instance/shared persistence for session revocation; the current RC1 target is one production backend instance.
 
 ## 2026-08-22 — Local runtime smoke
 

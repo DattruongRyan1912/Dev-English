@@ -6,7 +6,7 @@ Status: **In progress — P0 batch partial**
 
 - Remove fake runtime metrics from production responses.
 - Probe configured providers through real authenticated health requests.
-- Make production auth/database/bootstrap/CORS requirements fail closed.
+- Make production auth/database/login/CORS requirements fail closed.
 - Disable deterministic AI fallback and demo seeding in production.
 - Done locally: live provider probes, API-level voice chain, migration tracking and backup/restore rehearsal.
 - Remaining: browser microphone evidence, real HTTPS deployment and production deployment evidence.

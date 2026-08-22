@@ -1,3 +1,21 @@
+class AuthUser {
+  const AuthUser({
+    required this.id,
+    required this.displayName,
+    required this.cefr,
+  });
+
+  final String id;
+  final String displayName;
+  final String cefr;
+
+  factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
+    id: _string(json['id'], 'user-1'),
+    displayName: _string(json['displayName'], 'Developer'),
+    cefr: _string(json['cefr'], 'A1'),
+  );
+}
+
 class Mission {
   const Mission({
     required this.id,

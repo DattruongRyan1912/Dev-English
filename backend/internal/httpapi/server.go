@@ -2,12 +2,15 @@ package httpapi
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/ai"
@@ -23,7 +26,12 @@ type Server struct {
 	Auth           *auth.Manager
 	StrictAuth     bool
 	AllowedOrigins []string
+	LoginSecret    string
+	sessionMu      sync.Mutex
+	sessions       map[[sha256.Size]byte]time.Time
 }
+
+const webSessionCookieName = "devenglish_session"
 
 func NewServer(service *learning.Service, logger *slog.Logger, managers ...*auth.Manager) *Server {
 	if logger == nil {
@@ -33,13 +41,20 @@ func NewServer(service *learning.Service, logger *slog.Logger, managers ...*auth
 	if len(managers) > 0 {
 		manager = managers[0]
 	}
-	return &Server{Service: service, Logger: logger, Auth: manager}
+	return &Server{
+		Service:  service,
+		Logger:   logger,
+		Auth:     manager,
+		sessions: make(map[[sha256.Size]byte]time.Time),
+	}
 }
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
 	mux.HandleFunc("POST /api/v1/auth/session", s.authSession)
+	mux.HandleFunc("POST /api/v1/auth/login", s.authLogin)
+	mux.HandleFunc("POST /api/v1/auth/logout", s.authLogout)
 	mux.HandleFunc("GET /api/v1/auth/me", s.authMe)
 	mux.HandleFunc("GET /api/v1/home", s.home)
 	mux.HandleFunc("GET /api/v1/practice", s.practice)
@@ -77,7 +92,10 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" || (r.URL.Path == "/api/v1/auth/session" && r.Method == http.MethodPost) {
+		if r.URL.Path == "/healthz" ||
+			(r.URL.Path == "/api/v1/auth/session" && r.Method == http.MethodPost) ||
+			(r.URL.Path == "/api/v1/auth/login" && r.Method == http.MethodPost) ||
+			(r.URL.Path == "/api/v1/auth/logout" && r.Method == http.MethodPost) {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -89,12 +107,21 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		header := strings.TrimSpace(r.Header.Get("Authorization"))
-		if !strings.HasPrefix(header, "Bearer ") {
-			writeError(w, http.StatusUnauthorized, errors.New("bearer token is required"))
+		token, fromCookie := authTokenFromRequest(r)
+		if token == "" {
+			if !s.StrictAuth {
+				next.ServeHTTP(w, r)
+				return
+			}
+			writeError(w, http.StatusUnauthorized, errors.New("authentication is required"))
 			return
 		}
-		claims, err := s.Auth.Parse(strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")), time.Now().UTC())
+		now := time.Now().UTC()
+		if fromCookie && !s.webSessionActive(token, now) {
+			writeError(w, http.StatusUnauthorized, errors.New("session is invalid or expired"))
+			return
+		}
+		claims, err := s.Auth.Parse(token, now)
 		if err != nil {
 			writeError(w, http.StatusUnauthorized, err)
 			return
@@ -109,6 +136,10 @@ func (s *Server) withAuth(next http.Handler) http.Handler {
 }
 
 func (s *Server) authSession(w http.ResponseWriter, r *http.Request) {
+	if s.StrictAuth {
+		writeError(w, http.StatusNotFound, errors.New("development session bootstrap is disabled"))
+		return
+	}
 	var input struct {
 		UserID      string `json:"userId"`
 		DisplayName string `json:"displayName"`
@@ -146,6 +177,125 @@ func (s *Server) authSession(w http.ResponseWriter, r *http.Request) {
 		response["expiresAt"] = time.Unix(claims.ExpiresAt, 0).UTC()
 	}
 	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) authLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.StrictAuth {
+		writeError(w, http.StatusNotFound, errors.New("production login is disabled"))
+		return
+	}
+	if s.Auth == nil || !s.Auth.Enabled() || strings.TrimSpace(s.LoginSecret) == "" {
+		writeError(w, http.StatusServiceUnavailable, errors.New("authentication is not configured"))
+		return
+	}
+	var input struct {
+		Secret string `json:"secret"`
+	}
+	if err := decodeJSON(w, r, &input); err != nil {
+		return
+	}
+	if !hmac.Equal([]byte(s.LoginSecret), []byte(input.Secret)) {
+		writeError(w, http.StatusUnauthorized, errors.New("invalid credentials"))
+		return
+	}
+
+	now := time.Now().UTC()
+	user := domain.User{ID: "user-1", DisplayName: "Developer", CEFR: "A1", CreatedAt: now}
+	ctx := store.WithUser(r.Context(), user.ID)
+	if err := s.Service.Store.EnsureUser(ctx, user); err != nil {
+		writeError(w, http.StatusUnauthorized, errors.New("authenticated user is not available"))
+		return
+	}
+	token, claims, err := s.Auth.Issue(user.ID, now)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	expiresAt := time.Unix(claims.ExpiresAt, 0).UTC()
+	s.rememberWebSession(token, expiresAt)
+	http.SetCookie(w, &http.Cookie{
+		Name:     webSessionCookieName,
+		Value:    token,
+		Path:     "/",
+		Expires:  expiresAt,
+		MaxAge:   maxAge(expiresAt, now),
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+	})
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"user":      user,
+		"expiresAt": expiresAt,
+	})
+}
+
+func (s *Server) authLogout(w http.ResponseWriter, r *http.Request) {
+	if token, _ := authTokenFromRequest(r); token != "" {
+		s.revokeWebSession(token)
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     webSessionCookieName,
+		Value:    "",
+		Path:     "/",
+		Expires:  time.Unix(1, 0).UTC(),
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   s.StrictAuth,
+		SameSite: http.SameSiteStrictMode,
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func authTokenFromRequest(r *http.Request) (string, bool) {
+	header := strings.TrimSpace(r.Header.Get("Authorization"))
+	if strings.HasPrefix(header, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(header, "Bearer ")), false
+	}
+	if cookie, err := r.Cookie(webSessionCookieName); err == nil {
+		return strings.TrimSpace(cookie.Value), true
+	}
+	return "", false
+}
+
+func (s *Server) rememberWebSession(token string, expiresAt time.Time) {
+	fingerprint := sha256.Sum256([]byte(token))
+	s.sessionMu.Lock()
+	defer s.sessionMu.Unlock()
+	if s.sessions == nil {
+		s.sessions = make(map[[sha256.Size]byte]time.Time)
+	}
+	s.sessions[fingerprint] = expiresAt
+}
+
+func (s *Server) webSessionActive(token string, now time.Time) bool {
+	fingerprint := sha256.Sum256([]byte(token))
+	s.sessionMu.Lock()
+	defer s.sessionMu.Unlock()
+	expiresAt, ok := s.sessions[fingerprint]
+	if !ok {
+		return false
+	}
+	if !expiresAt.After(now) {
+		delete(s.sessions, fingerprint)
+		return false
+	}
+	return true
+}
+
+func (s *Server) revokeWebSession(token string) {
+	fingerprint := sha256.Sum256([]byte(token))
+	s.sessionMu.Lock()
+	delete(s.sessions, fingerprint)
+	s.sessionMu.Unlock()
+}
+
+func maxAge(expiresAt, now time.Time) int {
+	seconds := int(expiresAt.Sub(now).Seconds())
+	if seconds < 1 {
+		return 1
+	}
+	return seconds
 }
 
 func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
@@ -593,15 +743,26 @@ func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := strings.TrimSpace(r.Header.Get("Origin"))
 		if len(allowedOrigins) == 0 {
-			w.Header().Set("Access-Control-Allow-Origin", "*")
-		} else if origin != "" && containsOrigin(allowedOrigins, origin) {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
+			if origin == "" {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			} else {
+				// Development keeps the local Flutter browser flow convenient. Production
+				// always supplies an explicit allowlist before the server starts.
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Add("Vary", "Origin")
+				w.Header().Set("Access-Control-Allow-Credentials", "true")
+			}
+		} else {
 			w.Header().Add("Vary", "Origin")
-		} else if origin != "" {
-			writeError(w, http.StatusForbidden, errors.New("origin is not allowed"))
-			return
+			if origin != "" && containsOrigin(allowedOrigins, origin) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+			} else if origin != "" {
+				writeError(w, http.StatusForbidden, errors.New("origin is not allowed"))
+				return
+			}
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Bootstrap-Key")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
