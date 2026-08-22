@@ -234,4 +234,4 @@ Checks:
 Remaining:
 
 - Real HTTPS/domain/certificate deployment and production Postgres/auth/secret/backup/readiness verification.
-- Main branch protection/PR workflow still needs to be enabled and exercised on the feature branch.
+- Draft PR #1 and protected `main` are in place; merge still requires one independent approval.

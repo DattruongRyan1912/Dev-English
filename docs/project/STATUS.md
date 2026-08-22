@@ -48,6 +48,7 @@ Overall state: **In progress — P0–P4 local gates are verified; P5 production
 - [x] Verified the browser/API/PostgreSQL learning loops: diagnostic state, work-context/GitHub mission and vocabulary, writing evaluation/mistake memory/skill update, SRS review, roleplay and Copilot.
 - [x] Increased the Work Context client timeout to 90 seconds for provider-backed analysis and added an API-client regression test.
 - [x] Added a repeatable Chrome widget smoke for Home, Practice, Review and Progress and wired it into CI.
+- [x] P4 delivery controls are active: feature branch `chore/rc1-timeout-browser-smoke`, draft PR #1, passing GitHub `backend`/`flutter` checks, and protected `main`.
 
 ## In progress
 
