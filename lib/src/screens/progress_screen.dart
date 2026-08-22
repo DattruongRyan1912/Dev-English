@@ -59,13 +59,6 @@ class ProgressScreen extends StatelessWidget {
                   value: '${progress.repeatedMistakes}',
                 ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _Metric(
-                  label: 'VN fallback',
-                  value: '${progress.fallback.round()}%',
-                ),
-              ),
             ],
           ),
           const SizedBox(height: AppSpacing.section),

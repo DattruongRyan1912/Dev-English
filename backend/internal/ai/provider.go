@@ -53,6 +53,12 @@ type LLMProvider interface {
 // Provider is kept as a concise alias for the learning service dependency.
 type Provider = LLMProvider
 
+// HealthChecker is implemented by providers that can perform a cheap,
+// authenticated connectivity probe without consuming a generation quota.
+type HealthChecker interface {
+	HealthCheck(context.Context) error
+}
+
 type Transcript struct {
 	Text       string  `json:"text"`
 	Confidence float64 `json:"confidence"`
@@ -361,6 +367,31 @@ func NewDeepSeekFromEnv() *DeepSeekProvider {
 func (p *DeepSeekProvider) Name() string     { return "deepseek" }
 func (p *DeepSeekProvider) Configured() bool { return strings.TrimSpace(p.APIKey) != "" }
 
+func (p *DeepSeekProvider) HealthCheck(ctx context.Context) error {
+	if !p.Configured() {
+		return ErrProviderUnavailable
+	}
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(p.BaseURL, "/")+"/models", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return providerHTTPError("deepseek health check", resp)
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+	return nil
+}
+
 func (p *DeepSeekProvider) GenerateMission(ctx context.Context, request MissionRequest) (domain.Mission, error) {
 	if !p.Configured() {
 		return domain.Mission{}, ErrProviderUnavailable
@@ -510,22 +541,41 @@ func (p *DeepSeekProvider) chatJSON(ctx context.Context, model, system, user str
 }
 
 type FallbackProvider struct {
-	Primary  Provider
-	Fallback DeterministicProvider
+	Primary       Provider
+	Fallback      DeterministicProvider
+	AllowFallback bool
 }
 
 func (p FallbackProvider) Name() string {
-	if p.Primary != nil && p.Primary.Configured() {
+	if p.Primary != nil && (p.Primary.Configured() || !p.AllowFallback) {
 		return p.Primary.Name()
 	}
 	return p.Fallback.Name()
 }
 func (p FallbackProvider) Configured() bool { return p.Primary != nil && p.Primary.Configured() }
+func (p FallbackProvider) HealthCheck(ctx context.Context) error {
+	if p.Primary == nil || !p.Primary.Configured() {
+		return ErrProviderUnavailable
+	}
+	checker, ok := p.Primary.(HealthChecker)
+	if !ok {
+		return errors.New("primary provider does not support health checks")
+	}
+	return checker.HealthCheck(ctx)
+}
+
+func (p FallbackProvider) fallbackEnabled() bool { return p.AllowFallback }
+
 func (p FallbackProvider) GenerateMission(ctx context.Context, request MissionRequest) (domain.Mission, error) {
 	if p.Primary != nil && p.Primary.Configured() {
 		if mission, err := p.Primary.GenerateMission(ctx, request); err == nil {
 			return mission, nil
+		} else if !p.fallbackEnabled() {
+			return domain.Mission{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
 		}
+	}
+	if !p.fallbackEnabled() {
+		return domain.Mission{}, ErrProviderUnavailable
 	}
 	return p.Fallback.GenerateMission(ctx, request)
 }
@@ -533,7 +583,12 @@ func (p FallbackProvider) EvaluateWriting(ctx context.Context, request WritingRe
 	if p.Primary != nil && p.Primary.Configured() {
 		if result, err := p.Primary.EvaluateWriting(ctx, request); err == nil {
 			return result, nil
+		} else if !p.fallbackEnabled() {
+			return domain.Evaluation{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
 		}
+	}
+	if !p.fallbackEnabled() {
+		return domain.Evaluation{}, ErrProviderUnavailable
 	}
 	return p.Fallback.EvaluateWriting(ctx, request)
 }
@@ -542,7 +597,12 @@ func (p FallbackProvider) GenerateRoleplay(ctx context.Context, request Roleplay
 	if provider, ok := p.Primary.(RoleplayProvider); ok && p.Primary.Configured() {
 		if result, err := provider.GenerateRoleplay(ctx, request); err == nil {
 			return result, nil
+		} else if !p.fallbackEnabled() {
+			return RoleplayResult{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
 		}
+	}
+	if !p.fallbackEnabled() {
+		return RoleplayResult{}, ErrProviderUnavailable
 	}
 	return p.Fallback.GenerateRoleplay(ctx, request)
 }
@@ -551,7 +611,12 @@ func (p FallbackProvider) GenerateCopilot(ctx context.Context, request CopilotRe
 	if provider, ok := p.Primary.(CopilotProvider); ok && p.Primary.Configured() {
 		if result, err := provider.GenerateCopilot(ctx, request); err == nil {
 			return result, nil
+		} else if !p.fallbackEnabled() {
+			return domain.CopilotResult{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
 		}
+	}
+	if !p.fallbackEnabled() {
+		return domain.CopilotResult{}, ErrProviderUnavailable
 	}
 	return p.Fallback.GenerateCopilot(ctx, request)
 }

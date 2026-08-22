@@ -19,7 +19,7 @@ Project tracking is maintained in [`docs/project/`](docs/project/README.md). Sta
 
 ### Backend
 
-- Go modular monolith with deterministic fallback behavior when provider keys are absent.
+- Go modular monolith with deterministic fallback behavior only in development; production fails closed when the primary provider is unavailable.
 - Adaptive daily mission, writing evaluation, retry feedback, mistake extraction and deterministic skill updates.
 - SRS review schedule: 1d → 3d → 7d → 14d → 30d.
 - Diagnostic questions with CEFR/skill result and recommended plan.
@@ -31,7 +31,7 @@ Project tracking is maintained in [`docs/project/`](docs/project/README.md). Sta
 - Speaking-session metadata with raw-audio expiry metadata; audio bytes are never written to the database.
 - Usage/cost records, configurable monthly budget and a hard 300,000 VND ceiling.
 - Personal vocabulary graph, seven-day learning analytics and weekly speaking assessment recommendations.
-- Provider connection status endpoint for DeepSeek, Groq Whisper and Azure speech capabilities without exposing secrets.
+- Provider connection status endpoint for DeepSeek, Groq Whisper and Azure speech capabilities with authenticated health probes, without exposing secrets.
 - HMAC bearer-session middleware, per-user repository scoping and authenticated data export/deletion boundary.
 - PostgreSQL/pgvector migration with tables for users, learning state, missions, attempts, evaluations, mistakes, vocabulary, conversations, speaking sessions, imported work and AI usage.
 
@@ -73,6 +73,8 @@ The migration is mounted into the database container. The production boundary ex
 ### Provider configuration
 
 ```bash
+export DEVENGLISH_ENV="development"
+export DEVENGLISH_ALLOWED_ORIGINS=""
 export DEEPSEEK_API_KEY="..."
 export DEEPSEEK_FAST_MODEL="deepseek-v4-flash"
 export DEEPSEEK_SMART_MODEL="deepseek-v4-pro"
@@ -97,6 +99,8 @@ export DEVENGLISH_BOOTSTRAP_KEY="local-bootstrap-key"
 
 Create a local session with `POST /api/v1/auth/session`, then send `Authorization: Bearer <token>`. The Flutter client can receive a pre-issued token with `--dart-define=API_TOKEN=...`.
 
+For a production process, set `DEVENGLISH_ENV=production`, provide `DATABASE_URL`, a 32+ character `DEVENGLISH_AUTH_SECRET`, a non-empty `DEVENGLISH_BOOTSTRAP_KEY`, and a comma-separated `DEVENGLISH_ALLOWED_ORIGINS` allowlist. Production does not seed demo data, does not use deterministic AI fallback, and rejects startup when this boundary is incomplete.
+
 ### Local Docker development
 
 The recommended local development boundary is Flutter on the host, with the Go backend and PostgreSQL running in Docker. Put provider secrets in the ignored `.env.local` file (copied from `.env.example`), then run:
@@ -109,10 +113,37 @@ docker compose --env-file .env.local -f infra/docker-compose.yml logs -f backend
 The backend is available at `http://localhost:8080`. Inside Compose, it connects to PostgreSQL through `postgres:5432`; do not use `localhost` for `DATABASE_URL` inside the container. Run Flutter on the host with:
 
 ```bash
-flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
+flutter run -d chrome --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://localhost:8080
 ```
 
 Stop the local stack with `docker compose --env-file .env.local -f infra/docker-compose.yml down`. This stops and removes the containers but keeps the named PostgreSQL volume.
+
+### Migrations and database recovery
+
+The Compose init directory is only applied automatically when PostgreSQL initializes a new volume. For an existing local volume, apply the tracked migrations explicitly:
+
+```bash
+make db-migrate
+```
+
+Create a private custom-format backup outside the repository when testing recovery:
+
+```bash
+BACKUP_DIR=/tmp/devenglish-backups make db-backup
+```
+
+Restore is destructive and requires an explicit confirmation. Always verify the target database before running it:
+
+```bash
+BACKUP_FILE=/tmp/devenglish-backups/devenglish-<timestamp>.dump \
+CONFIRM_RESTORE=YES make db-restore
+```
+
+Production restore additionally requires `ALLOW_PRODUCTION_RESTORE=YES`. Backup artifacts belong outside Git; the repository ignores `backups/` for accidental local output.
+
+### HTTPS deployment boundary
+
+`infra/Caddyfile.example` is the reverse-proxy template for a real domain. Set `DEVENGLISH_DOMAIN` to that domain, proxy to the backend, and configure `DEVENGLISH_ALLOWED_ORIGINS` with the matching `https://...` origin. HTTPS is not considered verified until DNS, the certificate and a real deployment target have been exercised.
 
 ## Flutter
 
@@ -121,7 +152,7 @@ flutter pub get
 flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
 ```
 
-If the backend is unavailable, the client keeps an inspectable demo state for UI work.
+In development, an unavailable backend enables an inspectable demo state for UI work. A production build must pass `--dart-define=DEVENGLISH_ENV=production`; it fails closed with a retry screen instead of showing demo scores, analytics or provider health.
 
 ## API surface
 

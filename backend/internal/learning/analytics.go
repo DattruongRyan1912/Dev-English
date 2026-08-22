@@ -7,34 +7,54 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/ai"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
 )
 
-func (s *Service) TestConnections(context.Context) []domain.ProviderCheck {
-	aiConfigured := s.AI != nil && s.AI.Configured()
-	aiStatus := "not_configured"
-	if aiConfigured {
-		aiStatus = "configured"
-	} else if s.AI != nil && s.AI.Name() == "deterministic-fallback" {
-		aiStatus = "fallback"
+func (s *Service) TestConnections(ctx context.Context) []domain.ProviderCheck {
+	checks := make([]domain.ProviderCheck, 0, 4)
+	if s.AI != nil && s.AI.Name() == "deterministic-fallback" {
+		checks = append(checks, domain.ProviderCheck{Provider: "DeepSeek", Status: "fallback"})
+	} else {
+		checks = append(checks, checkProvider(ctx, "DeepSeek", s.AI))
 	}
-	return []domain.ProviderCheck{
-		{Provider: "DeepSeek", Configured: aiConfigured, Status: aiStatus},
-		{Provider: "Groq Whisper", Configured: configured(s.STT), Status: configuredStatus(s.STT)},
-		{Provider: "Azure Pronunciation", Configured: configured(s.Pronunciation), Status: configuredStatus(s.Pronunciation)},
-		{Provider: "Azure Neural TTS", Configured: configured(s.TTS), Status: configuredStatus(s.TTS)},
-	}
+	checks = append(checks,
+		checkProvider(ctx, "Groq Whisper", s.STT),
+		checkProvider(ctx, "Azure Pronunciation", s.Pronunciation),
+		checkProvider(ctx, "Azure Neural TTS", s.TTS),
+	)
+	return checks
 }
 
 func configured(provider interface{ Configured() bool }) bool {
 	return provider != nil && provider.Configured()
 }
 
-func configuredStatus(provider interface{ Configured() bool }) string {
-	if configured(provider) {
-		return "configured"
+type namedProvider interface {
+	Name() string
+	Configured() bool
+}
+
+func checkProvider(ctx context.Context, name string, provider namedProvider) domain.ProviderCheck {
+	check := domain.ProviderCheck{Provider: name}
+	if provider == nil || !provider.Configured() {
+		check.Status = "not_configured"
+		return check
 	}
-	return "not_configured"
+	check.Configured = true
+	checker, ok := provider.(ai.HealthChecker)
+	if !ok {
+		check.Status = "unhealthy"
+		return check
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	if err := checker.HealthCheck(probeCtx); err != nil {
+		check.Status = "unhealthy"
+		return check
+	}
+	check.Status = "healthy"
+	return check
 }
 
 func (s *Service) VocabularyGraph(ctx context.Context) (domain.VocabularyGraph, error) {
@@ -174,7 +194,6 @@ func (s *Service) Analytics(ctx context.Context) (domain.AnalyticsSummary, error
 		result.VocabularyMastery /= float64(len(vocabulary))
 	}
 	result.TechnicalCommunicationScore = technicalCommunicationScore(state)
-	result.VietnameseFallbackFrequency = 18
 	weekly, err := s.WeeklySpeaking(ctx)
 	if err != nil {
 		return domain.AnalyticsSummary{}, err

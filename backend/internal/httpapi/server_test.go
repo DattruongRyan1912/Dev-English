@@ -34,6 +34,45 @@ func TestHomeEndpointReturnsLearningState(t *testing.T) {
 	}
 }
 
+func TestConfiguredCORSRejectsUnknownOrigins(t *testing.T) {
+	memory := store.NewSeeded(time.Now().UTC())
+	service := learning.NewService(memory, ai.DeterministicProvider{})
+	server := NewServer(service, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	server.AllowedOrigins = []string{"https://app.example.com"}
+	handler := server.Handler()
+
+	allowed := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	allowed.Header.Set("Origin", "https://app.example.com")
+	allowedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(allowedResponse, allowed)
+	if allowedResponse.Code != http.StatusOK || allowedResponse.Header().Get("Access-Control-Allow-Origin") != "https://app.example.com" {
+		t.Fatalf("allowed origin was not accepted: %d %q", allowedResponse.Code, allowedResponse.Header().Get("Access-Control-Allow-Origin"))
+	}
+
+	denied := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	denied.Header.Set("Origin", "https://evil.example.com")
+	deniedResponse := httptest.NewRecorder()
+	handler.ServeHTTP(deniedResponse, denied)
+	if deniedResponse.Code != http.StatusForbidden {
+		t.Fatalf("unknown origin returned %d, want 403", deniedResponse.Code)
+	}
+}
+
+func TestStrictAuthFailsClosedWhenNotConfigured(t *testing.T) {
+	memory := store.NewSeeded(time.Now().UTC())
+	service := learning.NewService(memory, ai.DeterministicProvider{})
+	server := NewServer(service, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	server.StrictAuth = true
+	handler := server.Handler()
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/home", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("strict auth returned %d, want 503", response.Code)
+	}
+}
+
 func TestWritingAttemptCreatesFeedback(t *testing.T) {
 	body := `{"answer":"The API returns a 500 error for files over 10 MB. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue and fix the upload limit."}`
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/missions/mission-today/attempts", strings.NewReader(body))

@@ -41,6 +41,31 @@ func NewGroqSTTFromEnv() *GroqSTTProvider {
 func (p *GroqSTTProvider) Name() string     { return "groq-whisper-large-v3" }
 func (p *GroqSTTProvider) Configured() bool { return strings.TrimSpace(p.APIKey) != "" }
 
+func (p *GroqSTTProvider) HealthCheck(ctx context.Context) error {
+	if !p.Configured() {
+		return ErrProviderUnavailable
+	}
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(p.BaseURL, "/")+"/models", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return providerHTTPError("groq health check", resp)
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+	return nil
+}
+
 func (p *GroqSTTProvider) Transcribe(ctx context.Context, audio []byte, mimeType string) (Transcript, error) {
 	if !p.Configured() {
 		return Transcript{}, ErrProviderUnavailable
@@ -54,7 +79,22 @@ func (p *GroqSTTProvider) Transcribe(ctx context.Context, audio []byte, mimeType
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	header := make(textproto.MIMEHeader)
-	header.Set("Content-Disposition", `form-data; name="file"; filename="recording"`)
+	extension := "webm"
+	switch strings.ToLower(strings.TrimSpace(strings.SplitN(mimeType, ";", 2)[0])) {
+	case "audio/wav", "audio/x-wav", "audio/wave":
+		extension = "wav"
+	case "audio/mpeg", "audio/mp3":
+		extension = "mp3"
+	case "audio/mp4", "audio/m4a":
+		extension = "m4a"
+	case "audio/ogg":
+		extension = "ogg"
+	case "audio/flac":
+		extension = "flac"
+	case "audio/opus":
+		extension = "opus"
+	}
+	header.Set("Content-Disposition", `form-data; name="file"; filename="recording.`+extension+`"`)
 	header.Set("Content-Type", mimeType)
 	part, err := writer.CreatePart(header)
 	if err != nil {
@@ -134,6 +174,35 @@ func (p *AzureSpeechProvider) Name() string {
 
 func (p *AzureSpeechProvider) Configured() bool {
 	return strings.TrimSpace(p.APIKey) != "" && strings.TrimSpace(p.STTURL) != ""
+}
+
+func (p *AzureSpeechProvider) HealthCheck(ctx context.Context) error {
+	if !p.Configured() {
+		return ErrProviderUnavailable
+	}
+	baseURL := strings.TrimRight(p.TTSURL, "/")
+	if baseURL == "" {
+		baseURL = strings.TrimRight(p.STTURL, "/")
+	}
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/cognitiveservices/voices/list", nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Ocp-Apim-Subscription-Key", p.APIKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return providerHTTPError("azure speech health check", resp)
+	}
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
+	return nil
 }
 
 func (p *AzureSpeechProvider) Assess(ctx context.Context, audio []byte, mimeType, reference string) (PronunciationResult, error) {

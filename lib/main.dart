@@ -66,6 +66,44 @@ class _AppShellState extends State<_AppShell> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
+        if (widget.controller.loading) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (widget.controller.usingDemo &&
+            !widget.controller.demoFallbackEnabled) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.cloud_off_outlined, size: 48),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Backend production chưa sẵn sàng',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      widget.controller.error ??
+                          'Không thể tải dữ liệu thật từ backend.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton.icon(
+                      onPressed: widget.controller.load,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Thử lại'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
         final pages = [
           HomeScreen(
             controller: widget.controller,
@@ -88,9 +126,7 @@ class _AppShellState extends State<_AppShell> {
           ProgressScreen(controller: widget.controller),
         ];
         return Scaffold(
-          body: widget.controller.loading
-              ? const Center(child: CircularProgressIndicator())
-              : IndexedStack(index: _index, children: pages),
+          body: IndexedStack(index: _index, children: pages),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _index,
             onDestinationSelected: (value) => setState(() => _index = value),

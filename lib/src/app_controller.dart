@@ -4,6 +4,14 @@ import 'api.dart';
 import 'demo_data.dart';
 import 'models.dart';
 
+const bool _allowDemoFallback =
+    String.fromEnvironment('DEVENGLISH_ENV', defaultValue: 'development') !=
+    'production';
+const VocabularyGraph _emptyVocabularyGraph = VocabularyGraph(
+  nodes: [],
+  edges: [],
+);
+
 class AppController extends ChangeNotifier {
   AppController({DevEnglishApi? api}) : _api = api ?? DevEnglishApi();
 
@@ -43,6 +51,7 @@ class AppController extends ChangeNotifier {
   bool get submitting => _submitting;
   bool get importing => _importing;
   bool get usingDemo => _usingDemo;
+  bool get demoFallbackEnabled => _allowDemoFallback;
   String? get error => _error;
   SubmissionResult? get lastSubmission => _lastSubmission;
   WorkImportResult? get lastWorkImport => _lastWorkImport;
@@ -91,12 +100,19 @@ class AppController extends ChangeNotifier {
         _analytics = results[0] as AnalyticsSummary;
         _weeklySpeaking = results[1] as WeeklySpeakingAssessment;
       } catch (_) {
-        _analytics = DemoData.analytics;
-        _weeklySpeaking = DemoData.weeklySpeaking;
+        if (_allowDemoFallback) {
+          _analytics = DemoData.analytics;
+          _weeklySpeaking = DemoData.weeklySpeaking;
+        } else {
+          _usingDemo = true;
+          _error = 'Không thể tải analytics production từ backend.';
+        }
       }
     } catch (_) {
       _usingDemo = true;
-      _error = 'Backend chưa chạy, đang hiển thị dữ liệu demo cục bộ.';
+      _error = _allowDemoFallback
+          ? 'Backend chưa chạy, đang hiển thị dữ liệu demo cục bộ.'
+          : 'Không thể kết nối backend production. Vui lòng thử lại.';
     } finally {
       _loading = false;
       notifyListeners();
@@ -111,8 +127,12 @@ class AppController extends ChangeNotifier {
     try {
       _lastSubmission = await _api.submitWriting(missionId, answer);
     } catch (_) {
-      _lastSubmission = _localEvaluation(answer);
-      _error = 'Đang dùng feedback local vì backend chưa sẵn sàng.';
+      if (_allowDemoFallback) {
+        _lastSubmission = _localEvaluation(answer);
+        _error = 'Đang dùng feedback local vì backend chưa sẵn sàng.';
+      } else {
+        _error = 'Không thể chấm bài từ backend production.';
+      }
     } finally {
       _submitting = false;
       notifyListeners();
@@ -176,7 +196,7 @@ class AppController extends ChangeNotifier {
       _diagnosticQuestions = await _api.diagnosticQuestions();
       notifyListeners();
     } catch (_) {
-      _diagnosticQuestions = DemoData.diagnosticQuestions;
+      if (!_allowDemoFallback) _diagnosticQuestions = const [];
       _error = 'Không thể tải bài diagnostic lúc này.';
       notifyListeners();
     }
@@ -194,17 +214,19 @@ class AppController extends ChangeNotifier {
       );
       await load();
     } catch (_) {
-      _diagnosticResult = const DiagnosticResult(
-        cefr: 'B1',
-        overallScore: 58,
-        strengths: ['You can describe concrete technical situations.'],
-        priorities: ['Technical writing', 'Speaking structure'],
-        recommendedPlan: [
-          'Write one 10-minute bug report each day.',
-          'Review two mistakes after each mission.',
-          'Explain one technical decision before the weekly checkpoint.',
-        ],
-      );
+      if (_allowDemoFallback) {
+        _diagnosticResult = const DiagnosticResult(
+          cefr: 'B1',
+          overallScore: 58,
+          strengths: ['You can describe concrete technical situations.'],
+          priorities: ['Technical writing', 'Speaking structure'],
+          recommendedPlan: [
+            'Write one 10-minute bug report each day.',
+            'Review two mistakes after each mission.',
+            'Explain one technical decision before the weekly checkpoint.',
+          ],
+        );
+      }
       _error = 'Không thể lưu kết quả diagnostic lúc này.';
     } finally {
       _working = false;
@@ -217,7 +239,7 @@ class AppController extends ChangeNotifier {
       _scenarios = await _api.roleplayScenarios();
       notifyListeners();
     } catch (_) {
-      _scenarios = DemoData.roleplayScenarios;
+      if (!_allowDemoFallback) _scenarios = const [];
       _error = 'Không thể tải roleplay scenarios lúc này.';
       notifyListeners();
     }
@@ -231,6 +253,10 @@ class AppController extends ChangeNotifier {
       _conversation = await _api.startRoleplay(scenarioId);
       _lastRoleplayTurn = null;
     } catch (_) {
+      if (!_allowDemoFallback) {
+        _error = 'Không thể bắt đầu roleplay production lúc này.';
+        return;
+      }
       final scenario = _scenarios.firstWhere(
         (item) => item.id == scenarioId,
         orElse: () => DemoData.roleplayScenarios.first,
@@ -265,6 +291,10 @@ class AppController extends ChangeNotifier {
       _lastRoleplayTurn = await _api.roleplayTurn(conversation.id, answer);
       _conversation = _lastRoleplayTurn!.conversation;
     } catch (_) {
+      if (!_allowDemoFallback) {
+        _error = 'Không thể gửi lượt roleplay production lúc này.';
+        return;
+      }
       final reply = answer.toLowerCase().contains('impact')
           ? 'Good. How will you validate the fix and communicate the result?'
           : 'What evidence supports that explanation, and what is the user impact?';
@@ -316,6 +346,10 @@ class AppController extends ChangeNotifier {
         context: context,
       );
     } catch (_) {
+      if (!_allowDemoFallback) {
+        _error = 'Không thể tạo English Copilot từ backend production.';
+        return;
+      }
       final action = vietnamese.toLowerCase().contains('kiểm tra')
           ? 'check the API again'
           : 'review this request';
@@ -345,9 +379,15 @@ class AppController extends ChangeNotifier {
       _usageSummary = results[2] as UsageSummary;
       notifyListeners();
     } catch (_) {
-      _vocabulary = DemoData.vocabulary;
-      _vocabularyGraph = DemoData.vocabularyGraph;
-      _usageSummary = DemoData.usage;
+      if (_allowDemoFallback) {
+        _vocabulary = DemoData.vocabulary;
+        _vocabularyGraph = DemoData.vocabularyGraph;
+        _usageSummary = DemoData.usage;
+      } else {
+        _vocabulary = const [];
+        _vocabularyGraph = _emptyVocabularyGraph;
+        _usageSummary = null;
+      }
       _error = 'Không thể tải vocabulary hoặc usage lúc này.';
       notifyListeners();
     }
@@ -364,9 +404,15 @@ class AppController extends ChangeNotifier {
       _providerChecks = results[1] as List<ProviderCheck>;
       _settings = results[2] as SettingsData;
     } catch (_) {
-      _usageSummary = DemoData.usage;
-      _providerChecks = DemoData.providerChecks;
-      _settings = DemoData.settings;
+      if (_allowDemoFallback) {
+        _usageSummary = DemoData.usage;
+        _providerChecks = DemoData.providerChecks;
+        _settings = DemoData.settings;
+      } else {
+        _usageSummary = null;
+        _providerChecks = const [];
+        _error = 'Không thể tải cấu hình provider production lúc này.';
+      }
     }
     notifyListeners();
   }
@@ -375,7 +421,7 @@ class AppController extends ChangeNotifier {
     try {
       _providerChecks = await _api.testConnections();
     } catch (_) {
-      _providerChecks = DemoData.providerChecks;
+      if (!_allowDemoFallback) _providerChecks = const [];
       _error = 'Không thể kiểm tra provider lúc này.';
     }
     notifyListeners();

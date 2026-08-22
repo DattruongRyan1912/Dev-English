@@ -163,11 +163,10 @@ type PracticeMode struct {
 }
 
 type ProgressSummary struct {
-	LearningState      LearningState   `json:"learningState"`
-	RepeatedMistakes   int             `json:"repeatedMistakes"`
-	SpeakingTrend      []ProgressPoint `json:"speakingTrend"`
-	TechnicalScore     float64         `json:"technicalScore"`
-	VietnameseFallback float64         `json:"vietnameseFallback"`
+	LearningState    LearningState   `json:"learningState"`
+	RepeatedMistakes int             `json:"repeatedMistakes"`
+	SpeakingTrend    []ProgressPoint `json:"speakingTrend"`
+	TechnicalScore   float64         `json:"technicalScore"`
 }
 
 type Settings struct {
@@ -346,7 +345,6 @@ type AnalyticsSummary struct {
 	MissionsCreated             int                      `json:"missionsCreated"`
 	RepeatedMistakes            int                      `json:"repeatedMistakes"`
 	TechnicalCommunicationScore float64                  `json:"technicalCommunicationScore"`
-	VietnameseFallbackFrequency float64                  `json:"vietnameseFallbackFrequency"`
 	VocabularyMastery           float64                  `json:"vocabularyMastery"`
 	SpeakingTrend               []ProgressPoint          `json:"speakingTrend"`
 	WeeklySpeaking              WeeklySpeakingAssessment `json:"weeklySpeaking"`

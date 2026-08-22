@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-22
 
-Overall state: **In progress — local V1 core is runnable**
+Overall state: **In progress — local V1 core is runnable; P0 hardening is partial**
 
 ## Current runtime
 
@@ -25,12 +25,18 @@ Overall state: **In progress — local V1 core is runnable**
 - [x] Provider connection status and pronunciation setting.
 - [x] Docker development topology and local release-web serving.
 - [x] Writing submission state transition: feedback renders, progress reaches `2 / 2`, and a passing result continues to the next mission.
+- [x] Removed the hard-coded Vietnamese fallback metric from the runtime API and Progress UI.
+- [x] Added real authenticated provider probes for DeepSeek, Groq Whisper and Azure Speech.
+- [x] Added production startup gates for database, auth/bootstrap secrets, CORS allowlist and no-demo-seed/no-fallback behavior.
+- [x] Added tracked migration versions plus guarded local database backup/restore scripts.
+- [x] Verified the provider-backed speaking API chain: Groq transcription, persisted session, Azure pronunciation/prosody assessment and Azure TTS output.
 
 ## In progress
 
-- [ ] Complete an end-to-end speaking session: record/transcribe, assess pronunciation and play TTS.
+- [ ] Complete the browser microphone leg of speaking: the Speaking screen renders, but microphone capture/permission did not transition under the in-app browser.
 - [ ] Verify roleplay, Copilot, GitHub import and SRS state transitions with real user actions.
 - [ ] Add repeatable automated browser/API smoke coverage for the core learning loop.
+- [ ] Complete the remaining P0 production checks: real HTTPS deployment and browser microphone evidence.
 
 ## Staged or not started
 
@@ -44,5 +50,7 @@ Overall state: **In progress — local V1 core is runnable**
 
 - The local release web client must be rebuilt after Flutter source changes.
 - Initial mission generation and writing evaluation can take 12–60 seconds with the configured provider; the client now uses longer timeouts for those endpoints.
-- The current local web setup passes a development bearer token at build time; do not expose this build publicly.
-- Manual AI and microphone flows still need live-provider verification beyond read-only API smoke checks.
+- The current local web setup can pass a development bearer token at build time; do not expose this build publicly.
+- The browser microphone path still needs a real browser/device permission test; the API-level voice chain is verified locally.
+- AI usage cost values remain service-side estimates and are not a substitute for provider billing data.
+- No production DNS, certificate or hosting target has been provided, so HTTPS deployment remains unverified.

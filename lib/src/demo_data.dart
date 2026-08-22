@@ -251,7 +251,6 @@ class DemoData {
     state: home.state,
     repeatedMistakes: 1,
     technicalScore: 48,
-    fallback: 18,
     trend: home.progress,
   );
 
@@ -296,7 +295,6 @@ class DemoData {
     missionsCreated: 2,
     repeatedMistakes: 1,
     technicalCommunicationScore: 51,
-    vietnameseFallbackFrequency: 18,
     vocabularyMastery: 0.52,
     weeklySpeaking: weeklySpeaking,
   );

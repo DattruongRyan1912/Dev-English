@@ -185,20 +185,26 @@ class _ProviderRow extends StatelessWidget {
     child: Row(
       children: [
         Icon(
-          check.configured ? Icons.check_circle : Icons.circle_outlined,
+          check.status == 'healthy'
+              ? Icons.check_circle
+              : check.status == 'unhealthy'
+              ? Icons.error_outline
+              : Icons.circle_outlined,
           size: 18,
-          color: check.configured ? AppColors.success : AppColors.textSecondary,
+          color: check.status == 'healthy'
+              ? AppColors.success
+              : check.status == 'unhealthy'
+              ? AppColors.error
+              : AppColors.textSecondary,
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(child: Text(check.provider)),
-        Text(
-          check.status == 'fallback'
-              ? 'Fallback'
-              : check.configured
-              ? 'Ready'
-              : 'Not configured',
-          style: Theme.of(context).textTheme.labelMedium,
-        ),
+        Text(switch (check.status) {
+          'healthy' => 'Healthy',
+          'unhealthy' => 'Unhealthy',
+          'fallback' => 'Fallback',
+          _ => 'Not configured',
+        }, style: Theme.of(context).textTheme.labelMedium),
       ],
     ),
   );

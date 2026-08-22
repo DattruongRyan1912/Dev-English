@@ -19,7 +19,7 @@ func TestDeterministicEvaluatorReturnsStructuredFeedback(t *testing.T) {
 }
 
 func TestFallbackProviderUsesDeterministicModeWithoutKey(t *testing.T) {
-	provider := FallbackProvider{Primary: &DeepSeekProvider{}, Fallback: DeterministicProvider{}}
+	provider := FallbackProvider{Primary: &DeepSeekProvider{}, Fallback: DeterministicProvider{}, AllowFallback: true}
 	if provider.Configured() {
 		t.Fatal("empty DeepSeek provider must not be configured")
 	}

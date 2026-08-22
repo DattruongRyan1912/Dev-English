@@ -1,0 +1,13 @@
+{$DEVENGLISH_DOMAIN} {
+  encode gzip
+
+  # Run Caddy on the same host as the Docker-published backend port.
+  # If Caddy runs in Compose, use reverse_proxy backend:8080 instead.
+  reverse_proxy 127.0.0.1:8080
+
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}

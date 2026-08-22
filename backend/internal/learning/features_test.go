@@ -12,7 +12,7 @@ import (
 
 func TestDiagnosticUpdatesLearningState(t *testing.T) {
 	memory := store.NewSeeded(time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC))
-	service := NewService(memory, ai.FallbackProvider{Fallback: ai.DeterministicProvider{}})
+	service := NewService(memory, ai.FallbackProvider{Fallback: ai.DeterministicProvider{}, AllowFallback: true})
 	questions := service.DiagnosticQuestions()
 	responses := make([]domain.DiagnosticResponse, 0, len(questions))
 	for _, question := range questions {
@@ -33,7 +33,7 @@ func TestDiagnosticUpdatesLearningState(t *testing.T) {
 
 func TestRoleplayPersistsConversationAndFeedback(t *testing.T) {
 	memory := store.NewSeeded(time.Now().UTC())
-	service := NewService(memory, ai.FallbackProvider{Fallback: ai.DeterministicProvider{}})
+	service := NewService(memory, ai.FallbackProvider{Fallback: ai.DeterministicProvider{}, AllowFallback: true})
 	conversation, err := service.StartRoleplay(context.Background(), "pr-review")
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestReviewMovesVocabularyToNextInterval(t *testing.T) {
 func TestV2GraphAnalyticsAndWeeklySpeaking(t *testing.T) {
 	now := time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC)
 	memory := store.NewSeeded(now)
-	service := NewService(memory, ai.FallbackProvider{Fallback: ai.DeterministicProvider{}})
+	service := NewService(memory, ai.FallbackProvider{Fallback: ai.DeterministicProvider{}, AllowFallback: true})
 	service.Now = func() time.Time { return now }
 
 	graph, err := service.VocabularyGraph(context.Background())

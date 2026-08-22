@@ -18,9 +18,11 @@ import (
 )
 
 type Server struct {
-	Service *learning.Service
-	Logger  *slog.Logger
-	Auth    *auth.Manager
+	Service        *learning.Service
+	Logger         *slog.Logger
+	Auth           *auth.Manager
+	StrictAuth     bool
+	AllowedOrigins []string
 }
 
 func NewServer(service *learning.Service, logger *slog.Logger, managers ...*auth.Manager) *Server {
@@ -70,12 +72,20 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/missions/daily", s.createDailyMission)
 	mux.HandleFunc("POST /api/v1/work-context", s.workContext)
 	mux.HandleFunc("POST /api/v1/missions/", s.missionAction)
-	return withCORS(withRequestLog(s.withAuth(mux), s.Logger))
+	return withCORS(withRequestLog(s.withAuth(mux), s.Logger), s.AllowedOrigins)
 }
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.Auth == nil || !s.Auth.Enabled() || r.URL.Path == "/healthz" || (r.URL.Path == "/api/v1/auth/session" && r.Method == http.MethodPost) {
+		if r.URL.Path == "/healthz" || (r.URL.Path == "/api/v1/auth/session" && r.Method == http.MethodPost) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if s.Auth == nil || !s.Auth.Enabled() {
+			if s.StrictAuth {
+				writeError(w, http.StatusServiceUnavailable, errors.New("authentication is not configured"))
+				return
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -148,7 +158,17 @@ func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "service": "devenglish-backend", "time": time.Now().UTC(), "provider": domain.ProviderStatus{Name: s.Service.AI.Name(), Mode: "fallback-safe", Configured: s.Service.AI.Configured()}})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "service": "devenglish-backend", "time": time.Now().UTC(), "provider": domain.ProviderStatus{Name: s.Service.AI.Name(), Mode: providerMode(s.Service.AI), Configured: s.Service.AI.Configured()}})
+}
+
+func providerMode(provider ai.Provider) string {
+	if provider == nil || !provider.Configured() {
+		if provider != nil && provider.Name() == "deterministic-fallback" {
+			return "deterministic-fallback"
+		}
+		return "unavailable"
+	}
+	return "primary"
 }
 
 func (s *Server) home(w http.ResponseWriter, r *http.Request) {
@@ -569,9 +589,18 @@ func (s *Server) missionAction(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
-func withCORS(next http.Handler) http.Handler {
+func withCORS(next http.Handler, allowedOrigins []string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		if len(allowedOrigins) == 0 {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+		} else if origin != "" && containsOrigin(allowedOrigins, origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
+		} else if origin != "" {
+			writeError(w, http.StatusForbidden, errors.New("origin is not allowed"))
+			return
+		}
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
 		if r.Method == http.MethodOptions {
@@ -580,6 +609,15 @@ func withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func containsOrigin(allowedOrigins []string, origin string) bool {
+	for _, allowed := range allowedOrigins {
+		if allowed == origin {
+			return true
+		}
+	}
+	return false
 }
 
 func withRequestLog(next http.Handler, logger *slog.Logger) http.Handler {

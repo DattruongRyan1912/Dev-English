@@ -1,4 +1,4 @@
-.PHONY: backend-run backend-test content-check flutter-check docker-dev-up docker-dev-down docker-dev-logs check
+.PHONY: backend-run backend-test content-check flutter-check docker-dev-up docker-dev-down docker-dev-logs db-migrate db-backup db-restore check
 
 backend-run:
 	go run ./backend/cmd/server
@@ -24,5 +24,14 @@ docker-dev-down:
 
 docker-dev-logs:
 	docker compose --env-file .env.local -f infra/docker-compose.yml logs -f backend
+
+db-migrate:
+	./scripts/db_migrate.sh
+
+db-backup:
+	./scripts/db_backup.sh
+
+db-restore:
+	./scripts/db_restore.sh
 
 check: backend-test content-check flutter-check

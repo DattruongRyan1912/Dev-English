@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -61,6 +62,55 @@ func TestDeepSeekEvaluationRetriesInvalidStructuredOutput(t *testing.T) {
 	}
 }
 
+func TestProviderHealthChecksProbeAuthenticatedEndpoints(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && r.URL.Path == "/models" {
+			if r.Header.Get("Authorization") != "Bearer provider-key" {
+				t.Fatalf("missing provider authorization header")
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"data":[]}`)
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/cognitiveservices/voices/list" {
+			if r.Header.Get("Ocp-Apim-Subscription-Key") != "provider-key" {
+				t.Fatalf("missing Azure subscription header")
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `[]`)
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer server.Close()
+
+	deepSeek := &DeepSeekProvider{APIKey: "provider-key", BaseURL: server.URL, Client: server.Client()}
+	groq := &GroqSTTProvider{APIKey: "provider-key", BaseURL: server.URL, Client: server.Client()}
+	azure := &AzureSpeechProvider{APIKey: "provider-key", STTURL: server.URL, TTSURL: server.URL, Client: server.Client()}
+	for _, provider := range []HealthChecker{deepSeek, groq, azure} {
+		if err := provider.HealthCheck(context.Background()); err != nil {
+			t.Fatalf("health check failed: %v", err)
+		}
+	}
+}
+
+func TestFallbackProviderDoesNotHidePrimaryFailureWhenDisabled(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "provider unavailable", http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	provider := FallbackProvider{
+		Primary:       &DeepSeekProvider{APIKey: "provider-key", BaseURL: server.URL, Client: server.Client()},
+		Fallback:      DeterministicProvider{},
+		AllowFallback: false,
+	}
+	_, err := provider.GenerateMission(context.Background(), MissionRequest{LearningState: domain.LearningState{CEFR: "B1"}})
+	if !errors.Is(err, ErrProviderUnavailable) {
+		t.Fatalf("expected provider-unavailable error, got %v", err)
+	}
+}
+
 func TestGroqTranscribeSendsMultipartAudioWithoutPersistingIt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer groq-key" {
@@ -72,11 +122,14 @@ func TestGroqTranscribeSendsMultipartAudioWithoutPersistingIt(t *testing.T) {
 		if r.FormValue("model") != "whisper-test" || r.FormValue("language") != "en" {
 			t.Fatalf("unexpected STT fields: model=%q language=%q", r.FormValue("model"), r.FormValue("language"))
 		}
-		file, _, err := r.FormFile("file")
+		file, header, err := r.FormFile("file")
 		if err != nil {
 			t.Fatal(err)
 		}
 		defer file.Close()
+		if !strings.HasSuffix(header.Filename, ".webm") {
+			t.Fatalf("expected a provider-compatible audio filename, got %q", header.Filename)
+		}
 		body, err := io.ReadAll(file)
 		if err != nil || string(body) != "audio-bytes" {
 			t.Fatalf("unexpected audio payload: %q err=%v", body, err)

@@ -225,21 +225,18 @@ class ProgressData {
     required this.state,
     required this.repeatedMistakes,
     required this.technicalScore,
-    required this.fallback,
     required this.trend,
   });
 
   final LearningState state;
   final int repeatedMistakes;
   final double technicalScore;
-  final double fallback;
   final List<ProgressPoint> trend;
 
   factory ProgressData.fromJson(Map<String, dynamic> json) => ProgressData(
     state: LearningState.fromJson(_map(json['learningState'])),
     repeatedMistakes: _int(json['repeatedMistakes'], 0),
     technicalScore: _double(json['technicalScore']),
-    fallback: _double(json['vietnameseFallback']),
     trend: _maps(json['speakingTrend']).map(ProgressPoint.fromJson).toList(),
   );
 }
@@ -609,7 +606,6 @@ class AnalyticsSummary {
     required this.missionsCreated,
     required this.repeatedMistakes,
     required this.technicalCommunicationScore,
-    required this.vietnameseFallbackFrequency,
     required this.vocabularyMastery,
     required this.weeklySpeaking,
   });
@@ -620,25 +616,24 @@ class AnalyticsSummary {
   final int missionsCreated;
   final int repeatedMistakes;
   final double technicalCommunicationScore;
-  final double vietnameseFallbackFrequency;
   final double vocabularyMastery;
   final WeeklySpeakingAssessment weeklySpeaking;
 
-  factory AnalyticsSummary.fromJson(
-    Map<String, dynamic> json,
-  ) => AnalyticsSummary(
-    windowDays: _int(json['windowDays'], 7),
-    minutesLearned: _int(json['minutesLearned'], 0),
-    missionsCompleted: _int(json['missionsCompleted'], 0),
-    missionsCreated: _int(json['missionsCreated'], 0),
-    repeatedMistakes: _int(json['repeatedMistakes'], 0),
-    technicalCommunicationScore: _double(json['technicalCommunicationScore']),
-    vietnameseFallbackFrequency: _double(json['vietnameseFallbackFrequency']),
-    vocabularyMastery: _double(json['vocabularyMastery']),
-    weeklySpeaking: WeeklySpeakingAssessment.fromJson(
-      _map(json['weeklySpeaking']),
-    ),
-  );
+  factory AnalyticsSummary.fromJson(Map<String, dynamic> json) =>
+      AnalyticsSummary(
+        windowDays: _int(json['windowDays'], 7),
+        minutesLearned: _int(json['minutesLearned'], 0),
+        missionsCompleted: _int(json['missionsCompleted'], 0),
+        missionsCreated: _int(json['missionsCreated'], 0),
+        repeatedMistakes: _int(json['repeatedMistakes'], 0),
+        technicalCommunicationScore: _double(
+          json['technicalCommunicationScore'],
+        ),
+        vocabularyMastery: _double(json['vocabularyMastery']),
+        weeklySpeaking: WeeklySpeakingAssessment.fromJson(
+          _map(json['weeklySpeaking']),
+        ),
+      );
 }
 
 class ProviderCheck {

@@ -1,5 +1,16 @@
 # DevEnglish roadmap
 
+## Phase 0 — Personal Go-Live RC1 hardening
+
+Status: **In progress — P0 batch partial**
+
+- Remove fake runtime metrics from production responses.
+- Probe configured providers through real authenticated health requests.
+- Make production auth/database/bootstrap/CORS requirements fail closed.
+- Disable deterministic AI fallback and demo seeding in production.
+- Done locally: live provider probes, API-level voice chain, migration tracking and backup/restore rehearsal.
+- Remaining: browser microphone evidence, real HTTPS deployment and production deployment evidence.
+
 ## Phase 1 — Local foundation
 
 Status: **Done**
@@ -20,7 +31,7 @@ Status: **In progress**
 
 ## Phase 3 — Product hardening
 
-Status: **Not started**
+Status: **In progress — boundary controls added**
 
 - Add automated API integration tests for the core learning loop.
 - Add browser smoke tests for the four primary destinations.
@@ -35,4 +46,3 @@ Status: **Not started**
 - Object storage and retention jobs for audio.
 - Embedding generation and retrieval ranking.
 - Production secrets, observability, deployment and rollback procedures.
-

@@ -231,3 +231,7 @@ CREATE TABLE IF NOT EXISTS prompt_versions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (feature, version)
 );
+
+INSERT INTO schema_migrations(version)
+VALUES ('001_initial.sql')
+ON CONFLICT (version) DO NOTHING;

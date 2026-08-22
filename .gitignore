@@ -49,4 +49,5 @@ app.*.map.json
 .env.*
 !.env.example
 tmp/
+backups/
 .gitnexus

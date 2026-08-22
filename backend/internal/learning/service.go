@@ -180,7 +180,7 @@ func (s *Service) Progress(ctx context.Context) domain.ProgressSummary {
 			repeated++
 		}
 	}
-	return domain.ProgressSummary{LearningState: state, RepeatedMistakes: repeated, SpeakingTrend: trend, TechnicalScore: skillScore(state, "technical_writing"), VietnameseFallback: 18}
+	return domain.ProgressSummary{LearningState: state, RepeatedMistakes: repeated, SpeakingTrend: trend, TechnicalScore: skillScore(state, "technical_writing")}
 }
 
 func (s *Service) WorkImport(ctx context.Context, sourceType, title, content string) (domain.WorkImportResult, error) {
@@ -293,7 +293,18 @@ func (s *Service) UpdateSettings(ctx context.Context, settings domain.Settings) 
 }
 
 func (s *Service) providerStatus() domain.ProviderStatus {
-	return domain.ProviderStatus{Name: s.AI.Name(), Mode: "fallback-safe", Configured: s.AI.Configured()}
+	status := domain.ProviderStatus{Mode: "unavailable"}
+	if s.AI == nil {
+		return status
+	}
+	status.Name = s.AI.Name()
+	status.Configured = s.AI.Configured()
+	if status.Name == "deterministic-fallback" {
+		status.Mode = "deterministic-fallback"
+	} else if status.Configured {
+		status.Mode = "primary"
+	}
+	return status
 }
 
 func normalizeWeakest(state domain.LearningState) domain.LearningState {

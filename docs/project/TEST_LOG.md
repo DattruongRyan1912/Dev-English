@@ -1,5 +1,54 @@
 # DevEnglish test log
 
+## 2026-08-22 — Provider-backed speaking and database recovery
+
+Environment:
+
+- Docker backend and PostgreSQL/pgvector running locally with the configured providers.
+- A generated 16 kHz mono WAV was used for the deterministic API portion of the voice test; no secret values were logged.
+
+Verified:
+
+- `POST /api/v1/speaking/transcribe` reached Groq Whisper Large V3 and returned a transcript.
+- The transcript was persisted as a `SpeakingSession`.
+- `POST /api/v1/speaking/assess` reached Azure pronunciation/prosody and changed the session to `evaluated` with a non-null pronunciation result.
+- `POST /api/v1/speaking/synthesize` returned a playable MP3 file.
+- The browser reached the Speaking screen, but the in-app browser did not transition after `Start recording`; real microphone permission/device capture remains unproven.
+- `./scripts/db_migrate.sh` recorded `000_schema_migrations.sql` and `001_initial.sql` in `schema_migrations`.
+- `db_backup.sh` produced a PostgreSQL custom-format dump of 50,565 bytes with mode `600`.
+- `db_restore.sh` restored that dump into disposable database `devenglish_restore_test`; `users|7` and `schema_migrations|2` were observed before the disposable database was removed.
+- Restore without `CONFIRM_RESTORE=YES` was rejected before any database command ran.
+
+Implementation note:
+
+- Groq requires a supported audio extension in the multipart filename. The STT client now derives the filename extension from the uploaded MIME type, so WAV/WebM/MP3-style requests are identified correctly.
+
+Remaining evidence:
+
+- A real HTTPS domain, DNS, certificate and deployment target are still required for production verification.
+
+## 2026-08-22 — P0 production-boundary hardening
+
+Implemented and statically verified:
+
+- Production rejects missing `DATABASE_URL`, auth secret, bootstrap key or CORS allowlist.
+- Production skips local demo seeding and disables deterministic AI fallback.
+- Configured CORS rejects origins outside the explicit allowlist.
+- `/api/v1/settings/test` now performs authenticated provider probes instead of reporting configuration only.
+- Runtime `vietnameseFallback` fields were removed because no persisted source-of-truth existed.
+
+Checks:
+
+- `go test ./...` — passed (`36` tests across `10` packages).
+- `go vet ./...` — passed.
+- `flutter analyze` — passed.
+
+Not yet proven in this batch:
+
+- Production process startup with real secrets and PostgreSQL.
+- Live provider probe responses with the configured DeepSeek/Groq/Azure credentials.
+- HTTPS deployment.
+
 ## 2026-08-22 — Local runtime smoke
 
 Environment:
