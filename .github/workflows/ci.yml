@@ -31,5 +31,6 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - run: flutter test test/browser_smoke_test.dart -d chrome
       - run: flutter test --dart-define=DEVENGLISH_ENV=production
       - run: flutter build web --release

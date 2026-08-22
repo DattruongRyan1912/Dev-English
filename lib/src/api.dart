@@ -237,7 +237,7 @@ class DevEnglishApi {
       'sourceType': sourceType,
       'title': title,
       'content': content,
-    }),
+    }, timeout: const Duration(seconds: 90)),
   );
 
   Future<WorkImportResult> importGitHub(String url) async =>

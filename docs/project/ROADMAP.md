@@ -2,14 +2,14 @@
 
 ## Phase 0 — Personal Go-Live RC1 hardening
 
-Status: **In progress — local P0 hardening complete; deployment gates partial**
+Status: **In progress — local P0 hardening and real Chrome voice verification complete; deployment gates partial**
 
 - Remove fake runtime metrics from production responses.
 - Probe configured providers through real authenticated health requests.
 - Make production auth/database/login/CORS requirements fail closed.
 - Disable deterministic AI fallback and demo seeding in production.
 - Done locally: live provider probes, encrypted Settings lifecycle, capability-specific probe tests, API-level voice chain, atomic writing persistence, migration tracking and guarded backup/restore rehearsal.
-- Remaining: browser microphone evidence, real HTTPS deployment and production deployment evidence.
+- Remaining: real HTTPS deployment and production deployment evidence.
 
 ## Phase 1 — Local foundation
 
@@ -22,27 +22,27 @@ Status: **Done**
 
 ## Phase 2 — Core learning loop
 
-Status: **In progress — text loop and live AI features verified**
+Status: **Done locally — text, SRS and browser voice loops verified against PostgreSQL**
 
 - Run and verify: diagnostic → daily mission → writing feedback → retry.
 - Persist mistake and vocabulary extraction.
 - Verify review scheduling and progress updates after a completed mission.
 - Verify live provider behavior for text, speech-to-text, pronunciation and TTS.
-- Remaining: real browser microphone capture and an explicit SRS review-state transition check.
+- Real Chrome microphone capture, speaking assessment/TTS playback and an SRS mastery/next-review transition are verified.
 
 ## Phase 3 — Product hardening
 
-Status: **In progress — boundary controls and repeatable API smoke added**
+Status: **In progress — boundary controls, API smoke and Chrome smoke added**
 
 - Add automated API integration tests for the core learning loop.
 - Keep the writing outcome and PostgreSQL learning-state update atomic.
-- Add browser smoke tests for the four primary destinations. A manual smoke pass and repeatable API/database smoke are complete; repeatable browser automation remains.
+- Add browser smoke tests for the four primary destinations. A repeatable Chrome smoke and API/database smoke are complete.
 - Improve loading, empty, provider-error and microphone-permission states. Speaking state labels and retry paths are now explicit; real permission/device evidence remains.
 - Add usage/cost alerts and a repeatable local reset/seed workflow.
 
 ## Phase 4 — Production boundary
 
-Status: **Not started**
+Status: **Not started — production target is still required**
 
 - OAuth/private GitHub access and deeper project indexing.
 - Object storage and retention jobs for audio.

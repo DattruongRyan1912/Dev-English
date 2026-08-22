@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-23
 
-Overall state: **In progress — local RC1 hardening is implemented and runtime-verified; production gates remain**
+Overall state: **In progress — P0–P4 local gates are verified; P5 production deployment is blocked on a real target/domain**
 
 ## Current runtime
 
@@ -44,16 +44,19 @@ Overall state: **In progress — local RC1 hardening is implemented and runtime-
 - [x] Added a repeatable provider-backed API/PostgreSQL smoke script covering diagnostic, mission/writing, work import, review, roleplay, Copilot and public GitHub import; the disposable user is cleaned up automatically.
 - [x] Added explicit Speaking permission, recording, upload, transcription, assessment, TTS playback, success and retry state labels plus a Flutter widget regression test; web capture uses PCM16 streaming wrapped as WAV for Groq/Azure.
 - [x] Hardened production CORS to HTTPS-only explicit origins, credentialed cookies and a minimal preflight header allowlist; targeted Go tests pass.
+- [x] Verified the real Chrome speaking path: microphone permission, recording, Groq STT, PostgreSQL session persistence, Azure pronunciation/prosody assessment and Azure TTS playback.
+- [x] Verified the browser/API/PostgreSQL learning loops: diagnostic state, work-context/GitHub mission and vocabulary, writing evaluation/mistake memory/skill update, SRS review, roleplay and Copilot.
+- [x] Increased the Work Context client timeout to 90 seconds for provider-backed analysis and added an API-client regression test.
+- [x] Added a repeatable Chrome widget smoke for Home, Practice, Review and Progress and wired it into CI.
 
 ## In progress
 
-- [ ] Complete the browser microphone leg of speaking: the Speaking screen renders, but microphone capture/permission did not transition under the in-app browser.
-- [ ] Complete the browser microphone leg of speaking with a real Chrome/device permission test.
+- [x] Complete the browser microphone leg of speaking with a real Chrome permission/capture test.
 - [ ] Exercise the new login/logout flow against a real HTTPS deployment; local HTTP cannot validate a `Secure` cookie.
 - [x] Add repeatable automated API/PostgreSQL smoke coverage for the core learning loop.
-- [ ] Add repeatable automated browser smoke coverage for the core learning loop.
+- [x] Add repeatable automated Chrome smoke coverage for the four primary destinations.
 - [ ] Verify the private GitHub import path after a GitHub token and repository access are deliberately provisioned.
-- [ ] Complete the remaining P0 production checks: real HTTPS deployment and browser microphone evidence.
+- [ ] Complete the remaining P0 production check: real HTTPS deployment.
 
 ## Staged or not started
 
@@ -66,8 +69,8 @@ Overall state: **In progress — local RC1 hardening is implemented and runtime-
 ## Current risks
 
 - The local release web client must be rebuilt after Flutter source changes; production builds no longer accept `API_TOKEN`.
-- Initial mission generation and writing evaluation can take 12–60 seconds with the configured provider; the client now uses longer timeouts for those endpoints.
+- Provider-backed mission, writing and work-context generation can take 12–60 seconds; the client now uses longer timeouts for those endpoints.
 - Production sessions are single-instance in-memory revocable sessions; a future multi-instance deployment needs a shared session store.
-- The browser microphone path still needs a real browser/device permission test; the API-level voice chain is verified locally.
+- The in-app browser did not transition its microphone state; the real Chrome path is verified, so the remaining browser coverage is a second device/browser when practical.
 - AI usage cost values remain service-side estimates and are not a substitute for provider billing data.
 - No production DNS, certificate or hosting target has been provided, so HTTPS deployment remains unverified.

@@ -204,3 +204,34 @@ Remaining:
 
 - Real browser microphone permission/capture and playback evidence.
 - Real HTTPS/domain/certificate deployment and production Postgres/auth/secret/backup/readiness verification.
+
+## 2026-08-23 — RC1 P1/P2 Chrome and PostgreSQL verification
+
+Environment:
+
+- Docker backend and PostgreSQL/pgvector running locally.
+- Flutter release web rebuilt and served at `http://localhost:8093`.
+- Real Chrome tab with microphone permission available; no secrets were printed or committed.
+
+Verified:
+
+- Speaking browser E2E: `Ready` → `Recording` → `Success — transcript ready` → persisted `SpeakingSession` → `Success — pronunciation assessed` → `Playing feedback` → `Success — feedback played`. The persisted session was `evaluated`, contained the transcript and had pronunciation assessment data.
+- Diagnostic UI/API/PostgreSQL: 12-question flow returned A1 and `22.5`; `learning_state` and `diagnostic_results` rows were present.
+- Writing UI/API/PostgreSQL: the browser displayed `89 / 100` feedback. A deliberately malformed answer then produced three structured corrections, persisted three `mistakes`, and updated the user's skill profile.
+- Work Context: the first browser attempt exposed a real 30-second client timeout while the provider request took about 34 seconds. The Flutter endpoint now uses a 90-second timeout; the browser then rendered `Suggested mission` successfully. PostgreSQL contained work-context, mission and vocabulary rows.
+- GitHub UI import: public `https://github.com/octocat/Spoon-Knife` rendered a suggested mission with source URL and backend domain; the import was persisted in PostgreSQL.
+- Review UI/API/PostgreSQL: `observed behavior` was revealed and marked `Got it`; `vocabulary_reviews` recorded success `true`, score `90`, mastery advanced to `0.31` and `next_review` moved forward.
+- Roleplay UI/API/PostgreSQL: a real Chrome turn rendered the AI follow-up question; the conversation and roleplay usage rows were persisted.
+- Copilot UI/API/PostgreSQL: Simple, Natural and Professional outputs rendered; Copilot usage was persisted.
+
+Checks:
+
+- `flutter test` — passed (`5` tests, including API client and widget smoke tests).
+- `flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://localhost:8080` — passed.
+- `flutter analyze` — passed.
+- `go test -race ./...` and `go vet ./...` — passed.
+
+Remaining:
+
+- Real HTTPS/domain/certificate deployment and production Postgres/auth/secret/backup/readiness verification.
+- Main branch protection/PR workflow still needs to be enabled and exercised on the feature branch.

@@ -127,6 +127,12 @@ Run the repeatable local RC1 API/database smoke only when provider usage is inte
 DEVENGLISH_LIVE_SMOKE=YES scripts/smoke_local.sh
 ```
 
+Run the repeatable Chrome UI smoke for the four primary destinations:
+
+```bash
+flutter test test/browser_smoke_test.dart -d chrome
+```
+
 Stop the local stack with `docker compose --env-file .env.local -f infra/docker-compose.yml down`. This stops and removes the containers but keeps the named PostgreSQL volume.
 
 ### Migrations and database recovery
