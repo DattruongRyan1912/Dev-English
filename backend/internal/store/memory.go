@@ -93,6 +93,8 @@ func NewSeeded(now time.Time) *MemoryStore {
 	}
 }
 
+func (s *MemoryStore) Ready(context.Context) error { return nil }
+
 func (s *MemoryStore) EnsureUser(_ context.Context, user domain.User) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

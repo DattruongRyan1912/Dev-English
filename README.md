@@ -160,7 +160,7 @@ The restore script verifies `current_database()` against `CONFIRM_RESTORE_TARGET
 
 ### HTTPS deployment boundary
 
-`infra/Caddyfile.example` is the reverse-proxy template for a real domain. Set `DEVENGLISH_DOMAIN` to that domain, proxy to the backend, and configure `DEVENGLISH_ALLOWED_ORIGINS` with the matching `https://...` origin. HTTPS is not considered verified until DNS, the certificate and a real deployment target have been exercised.
+`infra/Caddyfile.example` is the local reverse-proxy template. The production topology is in `infra/docker-compose.production.yml`, with `Dockerfile.web`, `infra/Caddyfile.production` and `infra/production.env.example`. Follow [the production runbook](docs/project/PRODUCTION_RUNBOOK.md) on a real host. `/healthz` is liveness; `/readyz` checks PostgreSQL readiness. HTTPS is not considered verified until DNS, the certificate and a real deployment target have been exercised.
 
 ## Flutter
 
@@ -176,6 +176,7 @@ In development, an unavailable backend enables an inspectable demo state for UI 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/healthz` | Service/provider health |
+| GET | `/readyz` | PostgreSQL-backed readiness check |
 | POST | `/api/v1/auth/session` | Create a development/API-tooling bearer session |
 | POST | `/api/v1/auth/login` | Create the production HttpOnly browser session |
 | POST | `/api/v1/auth/logout` | Revoke and clear the production browser session |
@@ -229,6 +230,7 @@ flutter analyze
 flutter test
 flutter test --dart-define=DEVENGLISH_ENV=production
 flutter build web --release
+docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet
 ```
 
 ## Deliberate scope boundary

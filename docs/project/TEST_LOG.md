@@ -235,3 +235,24 @@ Remaining:
 
 - Real HTTPS/domain/certificate deployment and production Postgres/auth/secret/backup/readiness verification.
 - Draft PR #1 and protected `main` are in place; merge still requires one independent approval.
+
+## 2026-08-23 — Production packaging and local production-mode smoke
+
+Implemented:
+
+- Added `GET /readyz`, backed by `Repository.Ready`; PostgreSQL readiness uses `Pool.Ping` and the memory store remains testable.
+- Added CA certificates and `wget` to the backend runtime image for outbound TLS and container health checks.
+- Added `Dockerfile.web`, `infra/docker-compose.production.yml`, `infra/Caddyfile.production`, `infra/production.env.example` and `docs/project/PRODUCTION_RUNBOOK.md`.
+
+Checks:
+
+- `go test ./...`, `go test -race ./...` and `go vet ./...` — passed.
+- `docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet` — passed.
+- Backend production image build — passed.
+- Flutter/Caddy production image build with `API_BASE_URL=https://english.example.com` — passed.
+- Caddy production configuration validation — passed.
+- Local `DEVENGLISH_ENV=production` container smoke — `/healthz` 200, `/readyz` 200, login 200, authenticated `/auth/me` 200, logout 204 and configured HTTPS-origin CORS 200.
+
+Boundary:
+
+- This is local production-mode evidence only. The real domain, DNS, certificate, production host/database, off-host backup and external logging still require operator-provided infrastructure.

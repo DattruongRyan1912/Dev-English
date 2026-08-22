@@ -2,13 +2,13 @@
 
 ## Phase 0 — Personal Go-Live RC1 hardening
 
-Status: **In progress — local P0 hardening and real Chrome voice verification complete; deployment gates partial**
+Status: **In progress — local P0 hardening, production-mode smoke and deployment artifacts complete; real target gate remains**
 
 - Remove fake runtime metrics from production responses.
 - Probe configured providers through real authenticated health requests.
 - Make production auth/database/login/CORS requirements fail closed.
 - Disable deterministic AI fallback and demo seeding in production.
-- Done locally: live provider probes, encrypted Settings lifecycle, capability-specific probe tests, API-level voice chain, atomic writing persistence, migration tracking and guarded backup/restore rehearsal.
+- Done locally: live provider probes, encrypted Settings lifecycle, capability-specific probe tests, API-level voice chain, atomic writing persistence, migration tracking, guarded backup/restore rehearsal, production-mode container auth/readiness and production web/Caddy packaging.
 - Remaining: real HTTPS deployment and production deployment evidence.
 
 ## Phase 1 — Local foundation
@@ -42,9 +42,9 @@ Status: **In progress — boundary controls, API smoke and Chrome smoke added**
 
 ## Phase 4 — Production boundary
 
-Status: **Not started — production target is still required**
+Status: **Deployment artifacts ready — real production target is still required**
 
 - OAuth/private GitHub access and deeper project indexing.
 - Object storage and retention jobs for audio.
 - Embedding generation and retrieval ranking.
-- Production secrets, observability, deployment and rollback procedures.
+- Production secrets, observability, deployment and rollback procedures are documented in `docs/project/PRODUCTION_RUNBOOK.md`; execution still requires the real target.

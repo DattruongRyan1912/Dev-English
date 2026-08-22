@@ -1,0 +1,38 @@
+{
+	# Caddy obtains and renews the certificate for the configured domain.
+	email {$DEVENGLISH_TLS_EMAIL}
+}
+
+{$DEVENGLISH_DOMAIN} {
+	encode gzip
+
+	log {
+		output stdout
+		format json
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /healthz {
+		reverse_proxy backend:8080
+	}
+
+	handle /readyz {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-23
 
-Overall state: **In progress — P0–P4 local gates are verified; P5 production deployment is blocked on a real target/domain**
+Overall state: **In progress — P0–P5 artifacts and local production-mode gates are verified; P5 external deployment is blocked on a real target/domain**
 
 ## Current runtime
 
@@ -49,6 +49,8 @@ Overall state: **In progress — P0–P4 local gates are verified; P5 production
 - [x] Increased the Work Context client timeout to 90 seconds for provider-backed analysis and added an API-client regression test.
 - [x] Added a repeatable Chrome widget smoke for Home, Practice, Review and Progress and wired it into CI.
 - [x] P4 delivery controls are active: feature branch `chore/rc1-timeout-browser-smoke`, draft PR #1, passing GitHub `backend`/`flutter` checks, and protected `main`.
+- [x] Added PostgreSQL-backed `/readyz`, a production Flutter/Caddy image, hardened production Compose topology and a guarded production runbook.
+- [x] Ran a local production-mode container smoke: `/healthz`, `/readyz`, login, HttpOnly session lookup/logout and HTTPS-origin CORS passed.
 
 ## In progress
 
@@ -65,7 +67,7 @@ Overall state: **In progress — P0–P4 local gates are verified; P5 production
 - [ ] OAuth and private GitHub repository provisioning.
 - [ ] Deeper GitHub crawling/project indexing.
 - [ ] Object storage for retained audio and embedding generation/retrieval ranking.
-- [ ] Production deployment, observability and release runbook.
+- [ ] Execute production deployment, external observability and release/rollback checks on the real target; the runbook is now tracked.
 
 ## Current risks
 
@@ -75,3 +77,4 @@ Overall state: **In progress — P0–P4 local gates are verified; P5 production
 - The in-app browser did not transition its microphone state; the real Chrome path is verified, so the remaining browser coverage is a second device/browser when practical.
 - AI usage cost values remain service-side estimates and are not a substitute for provider billing data.
 - No production DNS, certificate or hosting target has been provided, so HTTPS deployment remains unverified.
+- The local production-mode container smoke validates the runtime boundary but cannot prove public DNS, certificate issuance, external backup retention or off-host observability.

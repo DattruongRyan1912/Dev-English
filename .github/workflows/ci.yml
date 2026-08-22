@@ -34,3 +34,12 @@ jobs:
       - run: flutter test test/browser_smoke_test.dart -d chrome
       - run: flutter test --dart-define=DEVENGLISH_ENV=production
       - run: flutter build web --release
+
+  production:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet
+      - run: docker build --file Dockerfile --tag devenglish-backend:ci .
+      - run: docker build --file Dockerfile.web --build-arg API_BASE_URL=https://english.example.com --tag devenglish-web:ci .
+      - run: docker run --rm -e DEVENGLISH_DOMAIN=english.example.com -e DEVENGLISH_TLS_EMAIL=ops@example.com devenglish-web:ci caddy validate --config /etc/caddy/Caddyfile

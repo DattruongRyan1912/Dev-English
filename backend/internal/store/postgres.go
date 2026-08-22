@@ -33,6 +33,8 @@ func NewPostgres(ctx context.Context, databaseURL string) (*PostgresStore, error
 
 func (s *PostgresStore) Close() { s.Pool.Close() }
 
+func (s *PostgresStore) Ready(ctx context.Context) error { return s.Pool.Ping(ctx) }
+
 func (s *PostgresStore) EnsureUser(ctx context.Context, user domain.User) error {
 	if user.ID == "" {
 		return errors.New("user id is required")
