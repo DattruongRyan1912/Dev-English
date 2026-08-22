@@ -1,0 +1,26 @@
+[
+  {
+    "title": "Write a useful bug report",
+    "mode": "writing",
+    "skill": "technical_writing",
+    "level": "B1",
+    "template": "WriteBugReport",
+    "targetVocabulary": ["reproduce", "expected behavior", "root cause", "impact"]
+  },
+  {
+    "title": "Explain an API failure",
+    "mode": "writing",
+    "skill": "technical_writing",
+    "level": "B1",
+    "template": "ExplainBug",
+    "targetVocabulary": ["observed behavior", "failure mode", "workaround", "next step"]
+  },
+  {
+    "title": "Clarify a backend requirement",
+    "mode": "roleplay",
+    "skill": "meeting",
+    "level": "B1",
+    "template": "ClarifyRequirement",
+    "targetVocabulary": ["acceptance criteria", "assumption", "edge case", "trade-off"]
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "version": "v1",
+  "skills": [
+    {"id":"documentation","label":"Documentation","category":"reading","levels":["A1","A2","B1","B2","C1"]},
+    {"id":"technical_writing","label":"Technical Writing","category":"writing","levels":["A1","A2","B1","B2","C1"]},
+    {"id":"git_communication","label":"Git Communication","category":"writing","levels":["A2","B1","B2","C1"]},
+    {"id":"speaking","label":"Speaking","category":"speaking","levels":["A1","A2","B1","B2","C1"]},
+    {"id":"meeting","label":"Meeting","category":"communication","levels":["A2","B1","B2","C1"]},
+    {"id":"system_design","label":"System Design","category":"professional_communication","levels":["B1","B2","C1"]},
+    {"id":"interview","label":"Technical Interview","category":"professional_communication","levels":["B1","B2","C1"]}
+  ]
+}

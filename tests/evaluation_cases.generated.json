@@ -1,0 +1,1402 @@
+[
+  {
+    "name": "complete_bug_report_001",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_002",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_003",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_004",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_005",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_006",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_007",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_008",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_009",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_010",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_011",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_012",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_013",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_014",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_015",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_016",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_017",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_018",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_019",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_020",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_021",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_022",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_023",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_024",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_025",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_026",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_027",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_028",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_029",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_030",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_031",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_032",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_033",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_034",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_035",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_036",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_037",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_038",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_039",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_040",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_041",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_042",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_043",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_044",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_045",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_046",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_047",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_048",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_049",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_050",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_051",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_052",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_053",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_054",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_055",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_056",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_057",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_058",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_059",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_060",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_061",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_062",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_063",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_064",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_065",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_066",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_067",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_068",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_069",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_070",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_071",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_072",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_073",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_074",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_075",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_076",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_077",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_078",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_079",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_080",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_081",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_082",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_083",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_084",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_085",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_086",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_087",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_088",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_089",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_090",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_091",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_092",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_093",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_094",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_095",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_096",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_097",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_098",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_099",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_100",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_101",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_102",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_103",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_104",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_105",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_106",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_107",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_108",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_109",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_110",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_111",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_112",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_113",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_114",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_115",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_116",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_117",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_118",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_119",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_120",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_121",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_122",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_123",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_124",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_125",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_126",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_127",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_128",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_129",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_130",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_131",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_132",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_133",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_134",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_135",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_136",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_137",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_138",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_139",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_140",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_141",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_142",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_143",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_144",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_145",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_146",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_147",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_148",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_149",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_150",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_151",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_152",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_153",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_154",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_155",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_156",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_157",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_158",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_159",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_160",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_161",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_162",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_163",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_164",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_165",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_166",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_167",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_168",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_169",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_170",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_171",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_172",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_173",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_174",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_175",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_176",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_177",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_178",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_179",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_180",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_181",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_182",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_183",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_184",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_185",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_186",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_187",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_188",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_189",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_190",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_191",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_192",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_193",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_194",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_195",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_196",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_197",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry_198",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "complete_bug_report_199",
+    "mission": "Write a bug report for an API returning HTTP 500.",
+    "answer": "The API returns a 500 error for large uploads. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake_200",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  }
+]

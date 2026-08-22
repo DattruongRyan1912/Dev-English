@@ -1,0 +1,9 @@
+{
+  "version": "v1",
+  "rubrics": [
+    "Writing: grammar 20, clarity 25, naturalness 20, technical accuracy 25, vocabulary 10",
+    "Speaking: fluency 20, pronunciation 20, grammar 15, vocabulary 15, clarity 15, technical accuracy 15",
+    "Technical discussion: understanding 20, reasoning 25, technical accuracy 25, communication 20, vocabulary 10",
+    "Roleplay: task completion 30, turn-taking 20, clarity 20, language control 20, vocabulary 10"
+  ]
+}

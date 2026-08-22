@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devenglish.local/schemas/roleplay.schema.json",
+  "type": "object",
+  "required": ["reply", "evaluation"],
+  "properties": {
+    "reply": {"type": "string", "minLength": 1},
+    "evaluation": {"$ref": "evaluation.schema.json"}
+  },
+  "additionalProperties": false
+}

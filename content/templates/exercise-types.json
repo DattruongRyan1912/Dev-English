@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "templates": [
+    "ExplainCode", "ExplainBug", "WriteBugReport", "WritePR", "WriteCommit",
+    "SummarizeDocumentation", "ClarifyRequirement", "CodeReview", "Standup",
+    "TechnicalDebate", "ArchitectureDecision", "SystemDesign", "TechnicalInterview",
+    "VocabularyInContext", "ErrorExplanation", "RequirementRewrite", "TechnicalSummary",
+    "MeetingResponse", "PairProgramming", "IncidentResponse", "ReleaseNotes",
+    "ChangelogEntry", "DependencyUpgrade", "PerformanceInvestigation", "TestPlan",
+    "OnCallHandoff", "DesignReview", "StakeholderUpdate", "FeatureDemo",
+    "RootCauseAnalysis", "MigrationPlan", "SecurityAdvisory", "APIContract",
+    "DataModelExplanation", "TechnicalNegotiation", "EscalationMessage", "LearningReflection",
+    "ListeningSummary", "PronunciationShadowing"
+  ]
+}

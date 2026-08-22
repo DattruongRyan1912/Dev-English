@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devenglish.local/schemas/evaluation.schema.json",
+  "type": "object",
+  "required": ["score", "summary", "whatWasGood", "mainIssue", "nextAction", "corrections", "technicalPoints"],
+  "properties": {
+    "score": { "type": "number", "minimum": 0, "maximum": 100 },
+    "summary": { "type": "string", "minLength": 1 },
+    "whatWasGood": { "type": "array", "items": { "type": "string" } },
+    "mainIssue": { "type": "string" },
+    "nextAction": { "type": "string" },
+    "corrections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["original", "corrected", "why", "type", "severity"],
+        "properties": {
+          "original": { "type": "string" },
+          "corrected": { "type": "string" },
+          "why": { "type": "string" },
+          "type": { "type": "string" },
+          "severity": { "type": "integer", "minimum": 1, "maximum": 3 }
+        }
+      }
+    },
+    "technicalPoints": { "type": "array", "items": { "type": "string" } }
+  }
+}

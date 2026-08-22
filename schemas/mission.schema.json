@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devenglish.local/schemas/mission.schema.json",
+  "type": "object",
+  "required": ["title", "mode", "skill", "level", "context", "prompt", "targetVocabulary", "expectedPoints"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "mode": { "enum": ["writing", "speaking", "reading", "review"] },
+    "skill": { "type": "string", "minLength": 1 },
+    "skillLabel": { "type": "string" },
+    "level": { "enum": ["A1", "A2", "B1", "B2", "C1"] },
+    "context": { "type": "string" },
+    "prompt": { "type": "string", "minLength": 1 },
+    "targetVocabulary": { "type": "array", "items": { "type": "string" } },
+    "expectedPoints": { "type": "array", "items": { "type": "string" } },
+    "estimatedMinutes": { "type": "integer", "minimum": 1, "maximum": 60 }
+  }
+}

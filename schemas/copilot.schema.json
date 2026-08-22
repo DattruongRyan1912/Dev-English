@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devenglish.local/schemas/copilot.schema.json",
+  "type": "object",
+  "required": ["simple", "natural", "professional", "explanation"],
+  "properties": {
+    "simple": {"type": "string", "minLength": 1},
+    "natural": {"type": "string", "minLength": 1},
+    "professional": {"type": "string", "minLength": 1},
+    "explanation": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

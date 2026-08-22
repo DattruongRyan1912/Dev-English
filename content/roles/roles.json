@@ -1,0 +1,11 @@
+{
+  "version": "v1",
+  "roles": [
+    "Engineering Manager", "Senior Backend Engineer", "Senior Frontend Engineer",
+    "Staff Engineer", "Tech Lead", "Product Manager", "QA Engineer", "SRE",
+    "Security Engineer", "Data Engineer", "Mobile Engineer", "Platform Engineer",
+    "Customer Support Engineer", "Incident Commander", "Architect", "Recruiter",
+    "Technical Writer", "Designer", "Project Manager", "External API Partner",
+    "New Teammate", "Code Reviewer", "Engineering Director", "Client Stakeholder"
+  ]
+}

@@ -1,0 +1,23 @@
+[
+  {
+    "name": "complete_bug_report",
+    "mission": "Write a bug report for an API returning HTTP 500 on large uploads.",
+    "answer": "The API returns a 500 error for files over 10 MB. The expected behavior is a validation error. This impacts users, and the next step is to reproduce the issue and fix the upload limit.",
+    "minimum_score": 70,
+    "expected_correction_count": 0
+  },
+  {
+    "name": "article_mistake",
+    "mission": "Write a concise bug report.",
+    "answer": "I created bug report and discuss about the impact.",
+    "minimum_score": 0,
+    "expected_correction_count": 2
+  },
+  {
+    "name": "short_answer_needs_retry",
+    "mission": "Explain the API failure.",
+    "answer": "It fails sometimes.",
+    "minimum_score": 0,
+    "expected_correction_count": 0
+  }
+]

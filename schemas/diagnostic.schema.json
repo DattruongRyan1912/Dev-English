@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://devenglish.local/schemas/diagnostic.schema.json",
+  "type": "object",
+  "required": ["cefr", "overallScore", "skillScores", "strengths", "priorities", "recommendedPlan"],
+  "properties": {
+    "cefr": {"enum": ["A1", "A2", "B1", "B2", "C1"]},
+    "overallScore": {"type": "number", "minimum": 0, "maximum": 100},
+    "skillScores": {"type": "array"},
+    "strengths": {"type": "array", "items": {"type": "string"}},
+    "priorities": {"type": "array", "items": {"type": "string"}},
+    "recommendedPlan": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}
