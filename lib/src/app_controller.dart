@@ -520,6 +520,54 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> saveModelSettings({
+    required String fastModel,
+    required String smartModel,
+  }) async {
+    try {
+      _settings = await _api.updateSettings(
+        _settings.copyWith(
+          fastModel: fastModel.trim(),
+          smartModel: smartModel.trim(),
+        ),
+      );
+      _error = null;
+    } catch (_) {
+      _error = 'Không thể lưu model DeepSeek lúc này.';
+    }
+    notifyListeners();
+  }
+
+  Future<void> setDeepSeekKey(String apiKey) async {
+    try {
+      _settings = await _api.setDeepSeekKey(apiKey.trim());
+      _error = null;
+    } catch (_) {
+      _error = 'Không thể lưu hoặc kiểm tra DeepSeek API key.';
+    }
+    notifyListeners();
+  }
+
+  Future<void> testDeepSeekKey() async {
+    try {
+      _settings = await _api.testDeepSeekKey();
+      _error = null;
+    } catch (_) {
+      _error = 'Không thể kiểm tra DeepSeek API key lúc này.';
+    }
+    notifyListeners();
+  }
+
+  Future<void> removeDeepSeekKey() async {
+    try {
+      _settings = await _api.removeDeepSeekKey();
+      _error = null;
+    } catch (_) {
+      _error = 'Không thể xoá DeepSeek API key lúc này.';
+    }
+    notifyListeners();
+  }
+
   Future<void> submitReview({
     required String kind,
     required String id,

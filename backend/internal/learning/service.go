@@ -13,13 +13,14 @@ import (
 )
 
 type Service struct {
-	Store         store.Repository
-	AI            ai.Provider
-	STT           ai.STTProvider
-	TTS           ai.TTSProvider
-	Pronunciation ai.PronunciationProvider
-	GitHub        GitHubImporter
-	Now           func() time.Time
+	Store           store.Repository
+	AI              ai.Provider
+	DeepSeekSecrets *DeepSeekSecretManager
+	STT             ai.STTProvider
+	TTS             ai.TTSProvider
+	Pronunciation   ai.PronunciationProvider
+	GitHub          GitHubImporter
+	Now             func() time.Time
 }
 
 type GitHubImporter interface {
@@ -118,30 +119,39 @@ func (s *Service) SubmitWriting(ctx context.Context, missionID, answer string) (
 	evaluation.Score = ai.FinalWritingScore(mission, answer, evaluation)
 	now := s.Now()
 	attempt := domain.MissionAttempt{ID: fmt.Sprintf("attempt-%d", now.UnixNano()), MissionID: missionID, Answer: answer, Score: evaluation.Score, SubmittedAt: now}
-	if err := s.Store.SaveAttempt(ctx, attempt); err != nil {
-		return domain.SubmissionResult{}, err
-	}
-	if err := s.Store.SaveWritingEvaluation(ctx, attempt, evaluation); err != nil {
-		return domain.SubmissionResult{}, err
-	}
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.AI.Name(), Model: "deepseek-v4-pro", Feature: "writing-evaluation", InputTokens: 900, OutputTokens: 500, EstimatedCost: estimateCost(s.AI.Name(), "deepseek-v4-pro", 900, 500), CreatedAt: now})
-	if err := s.Store.CompleteMission(ctx, missionID, now); err != nil {
-		return domain.SubmissionResult{}, err
-	}
 	mistakes := make([]domain.Mistake, 0, len(evaluation.Corrections))
 	for index, correction := range evaluation.Corrections {
 		id := fmt.Sprintf("mistake-%s-%s-%d", stableSlug(store.UserID(ctx)), stableSlug(correction.Original), index)
 		mastery := 0.2
 		mistakes = append(mistakes, domain.Mistake{ID: id, Type: correction.Type, Original: correction.Original, Corrected: correction.Corrected, Context: mission.Skill, Severity: correction.Severity, Frequency: 1, LastSeen: now, NextReview: NextReview(now, mastery, false), Mastery: mastery})
-		if err := s.Store.UpsertMistake(ctx, mistakes[len(mistakes)-1]); err != nil {
-			return domain.SubmissionResult{}, err
-		}
 	}
 	success := evaluation.Score >= 70 && len(evaluation.Corrections) <= 1
 	next := NextReview(now, averageMastery(mistakes), success)
-	if err := s.Store.UpdateSkill(ctx, mission.Skill, (evaluation.Score-60)/10); err != nil {
-		return domain.SubmissionResult{}, err
+	outcome := store.WritingOutcome{Attempt: attempt, Evaluation: evaluation, Mistakes: mistakes, MissionID: missionID, CompletedAt: now, Skill: mission.Skill, SkillDelta: (evaluation.Score - 60) / 10}
+	if transactional, ok := s.Store.(store.TransactionalWritingRepository); ok {
+		if err := transactional.SaveWritingOutcome(ctx, outcome); err != nil {
+			return domain.SubmissionResult{}, err
+		}
+	} else {
+		if err := s.Store.SaveAttempt(ctx, attempt); err != nil {
+			return domain.SubmissionResult{}, err
+		}
+		if err := s.Store.SaveWritingEvaluation(ctx, attempt, evaluation); err != nil {
+			return domain.SubmissionResult{}, err
+		}
+		if err := s.Store.CompleteMission(ctx, missionID, now); err != nil {
+			return domain.SubmissionResult{}, err
+		}
+		for _, mistake := range mistakes {
+			if err := s.Store.UpsertMistake(ctx, mistake); err != nil {
+				return domain.SubmissionResult{}, err
+			}
+		}
+		if err := s.Store.UpdateSkill(ctx, mission.Skill, outcome.SkillDelta); err != nil {
+			return domain.SubmissionResult{}, err
+		}
 	}
+	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.AI.Name(), Model: "deepseek-v4-pro", Feature: "writing-evaluation", InputTokens: 900, OutputTokens: 500, EstimatedCost: estimateCost(s.AI.Name(), "deepseek-v4-pro", 900, 500), CreatedAt: now})
 	return domain.SubmissionResult{Attempt: attempt, Evaluation: evaluation, Mistakes: mistakes, NextReview: next}, nil
 }
 
@@ -266,10 +276,25 @@ func (s *Service) recentWorkContext(ctx context.Context) string {
 
 func (s *Service) Settings(ctx context.Context) domain.Settings {
 	settings, _ := s.Store.Settings(ctx)
+	if settings.DeepSeekStatus == "" {
+		if settings.DeepSeekConfigured {
+			settings.DeepSeekStatus = DeepSeekStatusConnected
+		} else {
+			settings.DeepSeekStatus = DeepSeekStatusNotConfigured
+		}
+	}
 	return settings
 }
 
 func (s *Service) UpdateSettings(ctx context.Context, settings domain.Settings) domain.Settings {
+	updated, err := s.ApplySettings(ctx, settings)
+	if err != nil {
+		return s.Settings(ctx)
+	}
+	return updated
+}
+
+func (s *Service) ApplySettings(ctx context.Context, settings domain.Settings) (domain.Settings, error) {
 	current, _ := s.Store.Settings(ctx)
 	if strings.TrimSpace(settings.AIProvider) == "" {
 		settings.AIProvider = current.AIProvider
@@ -286,10 +311,27 @@ func (s *Service) UpdateSettings(ctx context.Context, settings domain.Settings) 
 	if settings.MonthlyBudgetVND > 300000 {
 		settings.MonthlyBudgetVND = 300000
 	}
+	if err := ai.ValidateModelName(settings.FastModel); err != nil {
+		return domain.Settings{}, err
+	}
+	if err := ai.ValidateModelName(settings.SmartModel); err != nil {
+		return domain.Settings{}, err
+	}
 	settings.DeepSeekConfigured = current.DeepSeekConfigured
+	settings.DeepSeekStatus = current.DeepSeekStatus
+	if settings.DeepSeekStatus == "" {
+		settings.DeepSeekStatus = DeepSeekStatusNotConfigured
+	}
 	settings.SpeechConfigured = current.SpeechConfigured
-	_ = s.Store.SaveSettings(ctx, settings)
-	return settings
+	if err := s.Store.SaveSettings(ctx, settings); err != nil {
+		return domain.Settings{}, err
+	}
+	if s.DeepSeekSecrets != nil && s.DeepSeekSecrets.Provider != nil {
+		if err := s.DeepSeekSecrets.Provider.SetModels(settings.FastModel, settings.SmartModel); err != nil {
+			return domain.Settings{}, err
+		}
+	}
+	return settings, nil
 }
 
 func (s *Service) providerStatus() domain.ProviderStatus {

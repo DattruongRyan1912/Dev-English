@@ -13,21 +13,22 @@ import (
 var ErrNotFound = errors.New("resource not found")
 
 type MemoryStore struct {
-	mu            sync.RWMutex
-	user          domain.User
-	learningState domain.LearningState
-	missions      map[string]domain.Mission
-	attempts      []domain.MissionAttempt
-	mistakes      map[string]domain.Mistake
-	vocabulary    map[string]domain.Vocabulary
-	workContexts  map[string]domain.WorkContext
-	settings      domain.Settings
-	progress      []domain.ProgressPoint
-	diagnostic    *domain.DiagnosticResult
-	scenarios     []domain.RoleplayScenario
-	conversations map[string]domain.Conversation
-	speaking      map[string]domain.SpeakingSession
-	usage         []domain.UsageRecord
+	mu             sync.RWMutex
+	user           domain.User
+	learningState  domain.LearningState
+	missions       map[string]domain.Mission
+	attempts       []domain.MissionAttempt
+	mistakes       map[string]domain.Mistake
+	vocabulary     map[string]domain.Vocabulary
+	workContexts   map[string]domain.WorkContext
+	settings       domain.Settings
+	deepSeekSecret *EncryptedSecret
+	progress       []domain.ProgressPoint
+	diagnostic     *domain.DiagnosticResult
+	scenarios      []domain.RoleplayScenario
+	conversations  map[string]domain.Conversation
+	speaking       map[string]domain.SpeakingSession
+	usage          []domain.UsageRecord
 }
 
 func NewSeeded(now time.Time) *MemoryStore {
@@ -75,7 +76,7 @@ func NewSeeded(now time.Time) *MemoryStore {
 			"vocab-2": {ID: "vocab-2", Term: "root cause", Domain: "debugging", Level: "B1", Definition: "the fundamental reason a problem occurs", UserContext: "identify the root cause", TechnicalExample: "The root cause is an unchecked upload limit.", RelatedTerms: []string{"reproduce", "next step"}, Mastery: 0.6, NextReview: now.Add(24 * time.Hour)},
 		},
 		workContexts: map[string]domain.WorkContext{},
-		settings:     domain.Settings{AIProvider: "deepseek", FastModel: "deepseek-v4-flash", SmartModel: "deepseek-v4-pro", DeepSeekConfigured: false, SpeechConfigured: false, PronunciationOn: false, MonthlyBudgetVND: 150000},
+		settings:     domain.Settings{AIProvider: "deepseek", FastModel: "deepseek-v4-flash", SmartModel: "deepseek-v4-pro", DeepSeekConfigured: false, DeepSeekStatus: "not_configured", SpeechConfigured: false, PronunciationOn: false, MonthlyBudgetVND: 150000},
 		progress: []domain.ProgressPoint{
 			{Date: now.AddDate(0, 0, -6).Format("2006-01-02"), Score: 49},
 			{Date: now.AddDate(0, 0, -5).Format("2006-01-02"), Score: 51},
@@ -171,6 +172,35 @@ func (s *MemoryStore) SaveAttempt(_ context.Context, attempt domain.MissionAttem
 }
 
 func (s *MemoryStore) SaveWritingEvaluation(_ context.Context, _ domain.MissionAttempt, _ domain.Evaluation) error {
+	return nil
+}
+
+func (s *MemoryStore) SaveWritingOutcome(_ context.Context, outcome WritingOutcome) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	mission, ok := s.missions[outcome.MissionID]
+	if !ok {
+		return ErrNotFound
+	}
+	s.attempts = append(s.attempts, outcome.Attempt)
+	mission.Status = "completed"
+	mission.CompletedAt = &outcome.CompletedAt
+	s.missions[outcome.MissionID] = mission
+	for _, item := range outcome.Mistakes {
+		if current, exists := s.mistakes[item.ID]; exists {
+			item.Frequency = current.Frequency + 1
+		}
+		s.mistakes[item.ID] = item
+	}
+	for index := range s.learningState.Skills {
+		if s.learningState.Skills[index].Skill == outcome.Skill {
+			s.learningState.Skills[index].Score = clampScore(s.learningState.Skills[index].Score + outcome.SkillDelta)
+			if outcome.SkillDelta > 0 {
+				s.learningState.Skills[index].Trend += outcome.SkillDelta
+			}
+		}
+	}
+	s.learningState = recomputeLearningState(s.learningState)
 	return nil
 }
 
@@ -297,6 +327,38 @@ func (s *MemoryStore) SaveSettings(_ context.Context, settings domain.Settings) 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.settings = settings
+	return nil
+}
+
+func (s *MemoryStore) DeepSeekSecret(context.Context) (EncryptedSecret, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.deepSeekSecret == nil {
+		return EncryptedSecret{}, ErrNotFound
+	}
+	return EncryptedSecret{
+		Ciphertext: append([]byte(nil), s.deepSeekSecret.Ciphertext...),
+		Nonce:      append([]byte(nil), s.deepSeekSecret.Nonce...),
+	}, nil
+}
+
+func (s *MemoryStore) SaveDeepSeekSecret(_ context.Context, secret EncryptedSecret) error {
+	if len(secret.Ciphertext) == 0 || len(secret.Nonce) == 0 {
+		return errors.New("encrypted DeepSeek secret is required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deepSeekSecret = &EncryptedSecret{
+		Ciphertext: append([]byte(nil), secret.Ciphertext...),
+		Nonce:      append([]byte(nil), secret.Nonce...),
+	}
+	return nil
+}
+
+func (s *MemoryStore) DeleteDeepSeekSecret(context.Context) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.deepSeekSecret = nil
 	return nil
 }
 

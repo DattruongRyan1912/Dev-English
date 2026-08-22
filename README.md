@@ -78,6 +78,8 @@ export DEVENGLISH_ALLOWED_ORIGINS="http://localhost:8093"
 export DEEPSEEK_API_KEY="..."
 export DEEPSEEK_FAST_MODEL="deepseek-v4-flash"
 export DEEPSEEK_SMART_MODEL="deepseek-v4-pro"
+# Server-side envelope-encryption key for the Settings UI; keep it only in .env.local.
+export DEVENGLISH_SECRET_ENCRYPTION_KEY="a-random-secret-at-least-32-characters"
 export GROQ_API_KEY="..."
 export AZURE_SPEECH_KEY="..."
 export AZURE_SPEECH_REGION="..."
@@ -87,6 +89,8 @@ export AZURE_SPEECH_TTS_BASE_URL=""
 ```
 
 Copy `.env.example` for the complete list. AI output is schema-validated with one bounded retry. The backend owns final writing/speaking scores, SRS transitions, mastery, due selection, quotas and usage records.
+
+The Settings screen can store a DeepSeek key without returning it to the client. Set, replace, test or remove it through the UI; the backend stores only authenticated ciphertext and exposes status/model metadata. Generate a local encryption key with `openssl rand -hex 32`, put the result in the ignored `.env.local`, and rebuild the backend. Production requires this variable explicitly and does not derive it from another secret.
 
 ### Authenticated mode
 
@@ -137,10 +141,10 @@ Restore is destructive and requires an explicit confirmation. Always verify the 
 
 ```bash
 BACKUP_FILE=/tmp/devenglish-backups/devenglish-<timestamp>.dump \
-CONFIRM_RESTORE=YES make db-restore
+CONFIRM_RESTORE=YES CONFIRM_RESTORE_TARGET=devenglish make db-restore
 ```
 
-Production restore additionally requires `ALLOW_PRODUCTION_RESTORE=YES`. Backup artifacts belong outside Git; the repository ignores `backups/` for accidental local output.
+The restore script verifies `current_database()` against `CONFIRM_RESTORE_TARGET` before invoking `pg_restore`. Production restore additionally requires `ALLOW_PRODUCTION_RESTORE=YES`. Backup artifacts belong outside Git; the repository ignores `backups/` for accidental local output.
 
 ### HTTPS deployment boundary
 
@@ -183,6 +187,11 @@ In development, an unavailable backend enables an inspectable demo state for UI 
 | GET | `/api/v1/speaking/weekly` | Weekly speaking/pronunciation assessment |
 | GET | `/api/v1/analytics` | Seven-day learning analytics |
 | GET | `/api/v1/settings/test` | Provider configuration status |
+| GET | `/api/v1/settings` | Safe settings metadata and DeepSeek status |
+| PUT | `/api/v1/settings` | Validate and save model/budget settings |
+| PUT | `/api/v1/settings/deepseek` | Encrypt, save, hot-load and test a DeepSeek key; never returns the key |
+| POST | `/api/v1/settings/deepseek/test` | Run a capability/model probe without changing the key |
+| DELETE | `/api/v1/settings/deepseek` | Remove the stored DeepSeek key |
 | GET | `/api/v1/usage` | Monthly usage/cost summary |
 | GET | `/api/v1/privacy/export` | User-scoped data export |
 | DELETE | `/api/v1/privacy/data` | Authenticated user-scoped deletion |

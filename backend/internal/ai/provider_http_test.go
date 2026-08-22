@@ -94,6 +94,62 @@ func TestProviderHealthChecksProbeAuthenticatedEndpoints(t *testing.T) {
 	}
 }
 
+func TestCapabilityProbesCheckTheConfiguredModelAndSeparateAzureCapabilities(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/models":
+			if r.Header.Get("Authorization") != "Bearer groq-key" {
+				t.Fatalf("missing Groq authorization header")
+			}
+			_, _ = io.WriteString(w, `{"data":[{"id":"whisper-test"}]}`)
+		case r.Method == http.MethodGet && r.URL.Path == "/cognitiveservices/voices/list":
+			if r.Header.Get("Ocp-Apim-Subscription-Key") != "azure-key" {
+				t.Fatalf("missing Azure TTS key")
+			}
+			_, _ = io.WriteString(w, `[{"ShortName":"en-US-Test"}]`)
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/speech/recognition/"):
+			if r.Header.Get("Ocp-Apim-Subscription-Key") != "azure-key" || r.Header.Get("Pronunciation-Assessment") == "" {
+				t.Fatalf("missing Azure pronunciation probe headers")
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"RecognitionStatus":"Success"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	groq := &GroqSTTProvider{APIKey: "groq-key", BaseURL: server.URL, Model: "whisper-test", Client: server.Client()}
+	groqCheck := groq.ProbeCapability(context.Background(), "speech_to_text")
+	if !groqCheck.Configured || !groqCheck.Reachable || !groqCheck.Healthy || groqCheck.Capability != "speech_to_text" || groqCheck.Model != "whisper-test" {
+		t.Fatalf("unexpected Groq capability probe: %+v", groqCheck)
+	}
+
+	azure := &AzureSpeechProvider{APIKey: "azure-key", STTURL: server.URL, TTSURL: server.URL, Voice: "en-US-Test", Client: server.Client()}
+	pronunciation := azure.ProbeCapability(context.Background(), "pronunciation_assessment")
+	if !pronunciation.Healthy || pronunciation.Capability != "pronunciation_assessment" || pronunciation.Model != "azure-pronunciation-assessment" {
+		t.Fatalf("unexpected Azure pronunciation probe: %+v", pronunciation)
+	}
+	tts := azure.ProbeCapability(context.Background(), "text_to_speech")
+	if !tts.Healthy || tts.Capability != "text_to_speech" || tts.Model != "en-US-Test" {
+		t.Fatalf("unexpected Azure TTS probe: %+v", tts)
+	}
+}
+
+func TestCapabilityProbeReturnsSafeErrors(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = io.WriteString(w, `{"error":"secret provider details must not escape"}`)
+	}))
+	defer server.Close()
+
+	provider := &GroqSTTProvider{APIKey: "groq-key", BaseURL: server.URL, Model: "whisper-test", Client: server.Client()}
+	check := provider.ProbeCapability(context.Background(), "speech_to_text")
+	if check.Healthy || !check.Reachable || check.Error != "authentication_failed" || strings.Contains(check.Error, "secret") {
+		t.Fatalf("probe leaked or misclassified provider error: %+v", check)
+	}
+}
+
 func TestFallbackProviderDoesNotHidePrimaryFailureWhenDisabled(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "provider unavailable", http.StatusBadGateway)

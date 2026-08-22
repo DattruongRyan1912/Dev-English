@@ -51,8 +51,15 @@ for migration in "${migrations[@]}"; do
     continue
   fi
 
-  psql_exec < "$migration"
-  psql_exec -c \
-    "INSERT INTO schema_migrations(version) VALUES ('$version') ON CONFLICT (version) DO NOTHING"
+  # Every migration must record its own version in the same transaction as its
+  # schema changes. The tracked SQL files do this explicitly; -1 makes a
+  # partial migration impossible if either statement fails.
+  psql_exec --single-transaction < "$migration"
+  recorded="$(psql_exec -Atqc \
+    "SELECT 1 FROM schema_migrations WHERE version = '$version' LIMIT 1")"
+  if [[ "$recorded" != "1" ]]; then
+    printf 'Migration %s completed without recording its version.\n' "$version" >&2
+    exit 1
+  fi
   printf 'applied %s\n' "$version"
 done

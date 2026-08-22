@@ -49,6 +49,9 @@ type Repository interface {
 	AllWorkContexts(context.Context) ([]domain.WorkContext, error)
 	Settings(context.Context) (domain.Settings, error)
 	SaveSettings(context.Context, domain.Settings) error
+	DeepSeekSecret(context.Context) (EncryptedSecret, error)
+	SaveDeepSeekSecret(context.Context, EncryptedSecret) error
+	DeleteDeepSeekSecret(context.Context) error
 	Progress(context.Context) ([]domain.ProgressPoint, error)
 	CompleteMission(context.Context, string, time.Time) error
 	UpdateSkill(context.Context, string, float64) error
@@ -63,4 +66,27 @@ type Repository interface {
 	Usage(context.Context, time.Time) ([]domain.UsageRecord, error)
 	SaveUsage(context.Context, domain.UsageRecord) error
 	DeleteUserData(context.Context) error
+}
+
+// WritingOutcome is the durable unit produced by one writing submission.
+// Implementations should persist the complete learning transition atomically.
+type WritingOutcome struct {
+	Attempt     domain.MissionAttempt
+	Evaluation  domain.Evaluation
+	Mistakes    []domain.Mistake
+	MissionID   string
+	CompletedAt time.Time
+	Skill       string
+	SkillDelta  float64
+}
+
+type TransactionalWritingRepository interface {
+	SaveWritingOutcome(context.Context, WritingOutcome) error
+}
+
+// EncryptedSecret is intentionally persistence-shaped: repositories only see
+// ciphertext and a nonce, never a provider API key in plaintext.
+type EncryptedSecret struct {
+	Ciphertext []byte
+	Nonce      []byte
 }

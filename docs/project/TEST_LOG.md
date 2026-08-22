@@ -129,3 +129,46 @@ For future entries record:
 - Expected result.
 - Observed result.
 - Follow-up issue or link, if any.
+
+## 2026-08-23 — RC1 hardening continuation
+
+Implementation and verification boundary:
+
+- Added AES-GCM envelope encryption for the DeepSeek secret, PostgreSQL `provider_secrets` storage, metadata-only settings endpoints and Flutter Settings controls.
+- Added safe capability probes: DeepSeek configured model list, Groq configured STT model, Azure Pronunciation assessment endpoint and Azure TTS voice list.
+- Added atomic PostgreSQL/memory writing outcome persistence for attempt, evaluation, mission completion, mistakes and learning-state update.
+- Applied `002_provider_secrets.sql` to the existing local PostgreSQL volume.
+
+Checks:
+
+- `go test ./...` — passed.
+- `flutter analyze` — passed (`No issues found`).
+- `flutter test` — passed (`1` test).
+- `bash -n scripts/db_migrate.sh scripts/db_restore.sh scripts/db_backup.sh` — passed.
+- `git diff --check` — passed.
+- `./scripts/db_migrate.sh` — passed; `schema_migrations` contains `000_schema_migrations.sql`, `001_initial.sql` and `002_provider_secrets.sql`; `provider_secrets` and `user_settings.deepseek_status` exist.
+- Capability probe HTTP tests — passed with safe error-code assertions and no provider response-body leakage.
+
+## 2026-08-23 — RC1 local runtime and browser smoke
+
+Environment:
+
+- Docker backend and PostgreSQL/pgvector running locally.
+- `.env.local` now contains an ignored 32-byte `DEVENGLISH_SECRET_ENCRYPTION_KEY`; the value was not printed or committed.
+- Flutter release web client served at `http://localhost:8093`.
+
+Verified:
+
+- `docker compose --env-file .env.local -f infra/docker-compose.yml up -d --build backend` — passed; the rebuilt backend started with the encryption key present.
+- `GET /healthz` — `200`; `GET /api/v1/settings` — DeepSeek connected and speech configured.
+- `GET /api/v1/settings/test` — DeepSeek text generation, Groq speech-to-text, Azure Pronunciation assessment and Azure Neural TTS all returned healthy capability-specific checks with safe metadata.
+- DeepSeek Settings lifecycle — set/test/remove, no raw key in responses, encrypted secret survived a backend restart, and the provider-secret row was removed cleanly.
+- Live PostgreSQL learning loop — generated a daily mission, submitted a writing attempt, returned score `95.5`, and persisted one completed mission, one attempt and one evaluation.
+- Live roleplay and Copilot requests — completed and persisted one roleplay usage record and one Copilot usage record.
+- Fresh in-app browser tab — Home rendered after the Flutter web rebuild; Practice, Review, Progress and Settings navigation rendered; Settings eventually displayed `Connected` after provider checks completed.
+- Speaking screen rendered with manual transcript fallback and a microphone entry point.
+
+Not yet proven:
+
+- The in-app browser microphone click did not transition from `Ready`; no permission prompt was accepted. A real Chrome/device permission test is still required.
+- Real HTTPS/domain/certificate deployment, production deployment and private GitHub import remain outside the local boundary.

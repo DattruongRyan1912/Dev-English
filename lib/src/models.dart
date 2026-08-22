@@ -112,6 +112,7 @@ class SettingsData {
     required this.fastModel,
     required this.smartModel,
     required this.deepSeekConfigured,
+    required this.deepSeekStatus,
     required this.speechConfigured,
     required this.pronunciationOn,
     required this.monthlyBudgetVnd,
@@ -121,6 +122,7 @@ class SettingsData {
   final String fastModel;
   final String smartModel;
   final bool deepSeekConfigured;
+  final String deepSeekStatus;
   final bool speechConfigured;
   final bool pronunciationOn;
   final int monthlyBudgetVnd;
@@ -130,16 +132,22 @@ class SettingsData {
     fastModel: _string(json['fastModel'], 'deepseek-v4-flash'),
     smartModel: _string(json['smartModel'], 'deepseek-v4-pro'),
     deepSeekConfigured: json['deepSeekConfigured'] == true,
+    deepSeekStatus: _string(json['deepSeekStatus'], 'not_configured'),
     speechConfigured: json['speechConfigured'] == true,
     pronunciationOn: json['pronunciationOn'] == true,
     monthlyBudgetVnd: _int(json['monthlyBudgetVnd'], 150000),
   );
 
-  SettingsData copyWith({bool? pronunciationOn}) => SettingsData(
+  SettingsData copyWith({
+    String? fastModel,
+    String? smartModel,
+    bool? pronunciationOn,
+  }) => SettingsData(
     aiProvider: aiProvider,
-    fastModel: fastModel,
-    smartModel: smartModel,
+    fastModel: fastModel ?? this.fastModel,
+    smartModel: smartModel ?? this.smartModel,
     deepSeekConfigured: deepSeekConfigured,
+    deepSeekStatus: deepSeekStatus,
     speechConfigured: speechConfigured,
     pronunciationOn: pronunciationOn ?? this.pronunciationOn,
     monthlyBudgetVnd: monthlyBudgetVnd,

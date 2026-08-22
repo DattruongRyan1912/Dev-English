@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-23
 
-Overall state: **In progress — local V1 core is runnable; P0.1 web authentication is implemented, RC1 is not ready**
+Overall state: **In progress — local RC1 hardening is implemented and runtime-verified; production gates remain**
 
 ## Current runtime
 
@@ -10,6 +10,7 @@ Overall state: **In progress — local V1 core is runnable; P0.1 web authenticat
 - Go backend runs in Docker at `http://localhost:8080`.
 - PostgreSQL/pgvector runs in Docker and is exposed locally on port `5433`.
 - The local provider configuration is loaded from ignored `.env.local`.
+- The ignored local environment contains `DEVENGLISH_SECRET_ENCRYPTION_KEY` for durable server-side secret storage.
 
 ## Done
 
@@ -33,14 +34,21 @@ Overall state: **In progress — local V1 core is runnable; P0.1 web authenticat
 - [x] Replaced production build-time bearer authentication with a server-issued `Secure`, `HttpOnly`, `SameSite=Strict` browser session.
 - [x] Added production login, session restoration, expiry handling, logout revocation and a fail-closed Flutter login state.
 - [x] Configured the Flutter web HTTP client to send session credentials cross-origin without embedding provider or auth secrets.
+- [x] Added encrypted server-side DeepSeek secret lifecycle with safe metadata-only settings responses and hot reload.
+- [x] Added capability-specific provider probes with safe errors, latency, configured model and Azure Pronunciation/TTS separation.
+- [x] Added an atomic PostgreSQL writing-outcome transaction and an atomic memory-store equivalent for local tests.
+- [x] Rebuilt the local Docker backend with the RC1 hardening batch and verified the encrypted DeepSeek lifecycle against PostgreSQL.
+- [x] Verified live capability probes for DeepSeek, Groq Whisper, Azure Pronunciation and Azure Neural TTS.
+- [x] Verified the live PostgreSQL learning loop, one roleplay turn and one Copilot request.
+- [x] Manually smoke-tested browser rendering and navigation for Home, Practice, Review, Progress and Settings.
 
 ## In progress
 
 - [ ] Complete the browser microphone leg of speaking: the Speaking screen renders, but microphone capture/permission did not transition under the in-app browser.
-- [ ] Complete P0.2 DeepSeek secret-management hardening before moving to provider or database follow-up work.
+- [ ] Complete the browser microphone leg of speaking with a real Chrome/device permission test.
 - [ ] Exercise the new login/logout flow against a real HTTPS deployment; local HTTP cannot validate a `Secure` cookie.
-- [ ] Verify roleplay, Copilot, GitHub import and SRS state transitions with real user actions.
 - [ ] Add repeatable automated browser/API smoke coverage for the core learning loop.
+- [ ] Verify the private GitHub import path after a GitHub token and repository access are deliberately provisioned.
 - [ ] Complete the remaining P0 production checks: real HTTPS deployment and browser microphone evidence.
 
 ## Staged or not started

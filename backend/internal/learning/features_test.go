@@ -60,6 +60,26 @@ func TestReviewMovesVocabularyToNextInterval(t *testing.T) {
 	}
 }
 
+func TestSubmitWritingPersistsTheLearningOutcomeAsOneTransition(t *testing.T) {
+	now := time.Date(2026, 8, 23, 0, 0, 0, 0, time.UTC)
+	memory := store.NewSeeded(now)
+	service := NewService(memory, ai.DeterministicProvider{})
+	service.Now = func() time.Time { return now }
+	answer := "Observed behavior: the API returns HTTP 500. Expected behavior: it should return HTTP 200. The root cause is an unchecked upload limit. The impact is that users cannot load the required data. Next step: reproduce the request locally and fix the validation."
+	result, err := service.SubmitWriting(context.Background(), "mission-today", answer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mission, err := memory.Mission(context.Background(), "mission-today")
+	if err != nil || mission.Status != "completed" || result.Attempt.ID == "" {
+		t.Fatalf("writing outcome was not persisted atomically: mission=%+v result=%+v err=%v", mission, result, err)
+	}
+	state, err := memory.LearningState(context.Background())
+	if err != nil || state.Skills[1].Score <= 48 {
+		t.Fatalf("learning state did not advance with the writing outcome: %+v err=%v", state, err)
+	}
+}
+
 func TestV2GraphAnalyticsAndWeeklySpeaking(t *testing.T) {
 	now := time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC)
 	memory := store.NewSeeded(now)

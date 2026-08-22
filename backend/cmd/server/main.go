@@ -18,6 +18,7 @@ import (
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/httpapi"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/integrations"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/learning"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/secrets"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/store"
 )
 
@@ -56,19 +57,43 @@ func main() {
 	if postgres != nil {
 		defer postgres.Close()
 	}
-	provider := ai.FallbackProvider{Primary: ai.NewDeepSeekFromEnv(), Fallback: ai.DeterministicProvider{}, AllowFallback: !production}
+	deepseek := ai.NewDeepSeekFromEnv()
+	secretBox, secretErr := secrets.NewFromEnv()
+	if secretErr != nil && production {
+		logger.Error("DeepSeek secret encryption is not configured", "error", secretErr)
+		os.Exit(1)
+	}
+	provider := ai.FallbackProvider{Primary: deepseek, Fallback: ai.DeterministicProvider{}, AllowFallback: !production}
 	stt := ai.NewGroqSTTFromEnv()
 	azure := ai.NewAzureSpeechFromEnv()
 	github := integrations.NewGitHubFromEnv()
+	service := learning.NewService(repository, provider, learning.SpeechDependencies{STT: stt, TTS: azure, Pronunciation: azure, GitHub: github})
+	service.DeepSeekSecrets = learning.NewDeepSeekSecretManager(repository, deepseek, secretBox)
+	if err := service.DeepSeekSecrets.Load(context.Background()); err != nil {
+		logger.Error("DeepSeek secret load failed", "error", err)
+		if production {
+			os.Exit(1)
+		}
+	}
 	if settings, err := repository.Settings(context.Background()); err == nil {
+		if settings.FastModel != "" && settings.SmartModel != "" {
+			if err := deepseek.SetModels(settings.FastModel, settings.SmartModel); err != nil {
+				logger.Warn("stored DeepSeek model settings are invalid", "error", err)
+			}
+		}
 		settings.DeepSeekConfigured = provider.Configured()
+		if settings.DeepSeekConfigured && settings.DeepSeekStatus == "not_configured" {
+			settings.DeepSeekStatus = learning.DeepSeekStatusConnected
+		}
+		if !settings.DeepSeekConfigured {
+			settings.DeepSeekStatus = learning.DeepSeekStatusNotConfigured
+		}
 		settings.SpeechConfigured = stt.Configured() || azure.Configured()
-		settings.PronunciationOn = azure.Configured()
+		settings.PronunciationOn = azure.PronunciationConfigured()
 		if err := repository.SaveSettings(context.Background(), settings); err != nil {
 			logger.Warn("could not update provider settings", "error", err)
 		}
 	}
-	service := learning.NewService(repository, provider, learning.SpeechDependencies{STT: stt, TTS: azure, Pronunciation: azure, GitHub: github})
 	api := httpapi.NewServer(service, logger, authManager)
 	api.StrictAuth = production
 	api.AllowedOrigins = allowedOrigins
@@ -126,6 +151,9 @@ func validateRuntimeConfig(environment string, authManager *auth.Manager, databa
 	}
 	if len(loginSecret) < 16 {
 		return fmt.Errorf("DEVENGLISH_LOGIN_SECRET must be at least 16 characters in production")
+	}
+	if len(strings.TrimSpace(os.Getenv("DEVENGLISH_SECRET_ENCRYPTION_KEY"))) < 32 {
+		return fmt.Errorf("DEVENGLISH_SECRET_ENCRYPTION_KEY must be at least 32 characters in production")
 	}
 	if databaseURL == "" {
 		return fmt.Errorf("DATABASE_URL is required in production")

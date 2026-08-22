@@ -25,6 +25,7 @@ services:
     environment:
       PORT: "8080"
       DATABASE_URL: postgres://devenglish:devenglish-local-only@postgres:5432/devenglish?sslmode=disable
+      DEVENGLISH_SECRET_ENCRYPTION_KEY: ${DEVENGLISH_SECRET_ENCRYPTION_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy

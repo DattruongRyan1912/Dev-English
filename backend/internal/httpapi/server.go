@@ -84,6 +84,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/v1/settings", s.settings)
 	mux.HandleFunc("GET /api/v1/settings/test", s.testSettings)
 	mux.HandleFunc("PUT /api/v1/settings", s.updateSettings)
+	mux.HandleFunc("PUT /api/v1/settings/deepseek", s.setDeepSeekSecret)
+	mux.HandleFunc("DELETE /api/v1/settings/deepseek", s.removeDeepSeekSecret)
+	mux.HandleFunc("POST /api/v1/settings/deepseek/test", s.testDeepSeekSecret)
 	mux.HandleFunc("POST /api/v1/missions/daily", s.createDailyMission)
 	mux.HandleFunc("POST /api/v1/work-context", s.workContext)
 	mux.HandleFunc("POST /api/v1/missions/", s.missionAction)
@@ -676,7 +679,64 @@ func (s *Server) updateSettings(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSON(w, r, &input); err != nil {
 		return
 	}
-	writeJSON(w, http.StatusOK, s.Service.UpdateSettings(r.Context(), input))
+	updated, err := s.Service.ApplySettings(r.Context(), input)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (s *Server) setDeepSeekSecret(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		APIKey string `json:"apiKey"`
+	}
+	if err := decodeJSON(w, r, &input); err != nil {
+		return
+	}
+	manager := s.Service.DeepSeekSecrets
+	if manager == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("DeepSeek secret management is not configured"))
+		return
+	}
+	settings, check, err := manager.Set(r.Context(), input.APIKey)
+	if err != nil {
+		if strings.Contains(err.Error(), "API key") {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeError(w, http.StatusServiceUnavailable, errors.New("DeepSeek secret could not be saved"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"settings": settings, "check": check})
+}
+
+func (s *Server) removeDeepSeekSecret(w http.ResponseWriter, r *http.Request) {
+	manager := s.Service.DeepSeekSecrets
+	if manager == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("DeepSeek secret management is not configured"))
+		return
+	}
+	settings, err := manager.Remove(r.Context())
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("DeepSeek secret could not be removed"))
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
+func (s *Server) testDeepSeekSecret(w http.ResponseWriter, r *http.Request) {
+	manager := s.Service.DeepSeekSecrets
+	if manager == nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("DeepSeek secret management is not configured"))
+		return
+	}
+	settings, check, err := manager.Test(r.Context())
+	if err != nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("DeepSeek connection test could not be completed"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"settings": settings, "check": check})
 }
 
 func (s *Server) createDailyMission(w http.ResponseWriter, r *http.Request) {

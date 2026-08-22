@@ -223,6 +223,7 @@ class DemoData {
     fastModel: 'deepseek-v4-flash',
     smartModel: 'deepseek-v4-pro',
     deepSeekConfigured: false,
+    deepSeekStatus: 'not_configured',
     speechConfigured: false,
     pronunciationOn: false,
     monthlyBudgetVnd: 300000,

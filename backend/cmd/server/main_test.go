@@ -15,6 +15,7 @@ func TestValidateRuntimeConfigRequiresProductionBoundary(t *testing.T) {
 	}
 
 	t.Setenv("DEVENGLISH_LOGIN_SECRET", "production-login-secret")
+	t.Setenv("DEVENGLISH_SECRET_ENCRYPTION_KEY", "production-secret-encryption-key-32")
 	if err := validateRuntimeConfig("production", manager, "postgres://db", []string{"https://app.example.com"}, "short"); err == nil {
 		t.Fatal("production with a short login secret must be rejected")
 	}
@@ -26,6 +27,10 @@ func TestValidateRuntimeConfigRequiresProductionBoundary(t *testing.T) {
 	}
 	if err := validateRuntimeConfig("production", manager, "postgres://db", []string{"https://app.example.com"}, "production-login-secret"); err != nil {
 		t.Fatalf("valid production config rejected: %v", err)
+	}
+	t.Setenv("DEVENGLISH_SECRET_ENCRYPTION_KEY", "short")
+	if err := validateRuntimeConfig("production", manager, "postgres://db", []string{"https://app.example.com"}, "production-login-secret"); err == nil {
+		t.Fatal("production with a short secret-encryption key must be rejected")
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +16,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
 )
 
 const maxAudioBytes = 25 << 20
@@ -64,6 +67,44 @@ func (p *GroqSTTProvider) HealthCheck(ctx context.Context) error {
 	}
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 	return nil
+}
+
+func (p *GroqSTTProvider) ProbeCapability(ctx context.Context, capability string) domain.ProviderCheck {
+	check := startProbe("Groq Whisper", capability, p.Model, p.Configured())
+	if !check.Configured {
+		return check
+	}
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(p.BaseURL, "/")+"/models", nil)
+	if err != nil {
+		return finishProbeError(check, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	check, resp := doProbeRequest(check, client, req)
+	if resp == nil || !check.Healthy {
+		return check
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&payload); err != nil {
+		return finishProbeError(check, err)
+	}
+	for _, item := range payload.Data {
+		if item.ID == p.Model {
+			return check
+		}
+	}
+	check.Healthy = false
+	check.Status = "unhealthy"
+	check.Error = "model_unavailable"
+	return check
 }
 
 func (p *GroqSTTProvider) Transcribe(ctx context.Context, audio []byte, mimeType string) (Transcript, error) {
@@ -173,11 +214,27 @@ func (p *AzureSpeechProvider) Name() string {
 }
 
 func (p *AzureSpeechProvider) Configured() bool {
+	return strings.TrimSpace(p.APIKey) != "" && (strings.TrimSpace(p.STTURL) != "" || strings.TrimSpace(p.TTSURL) != "")
+}
+
+func (p *AzureSpeechProvider) PronunciationConfigured() bool {
+	return p.pronunciationConfigured()
+}
+
+func (p *AzureSpeechProvider) pronunciationConfigured() bool {
 	return strings.TrimSpace(p.APIKey) != "" && strings.TrimSpace(p.STTURL) != ""
 }
 
+func (p *AzureSpeechProvider) TTSConfigured() bool {
+	return p.ttsConfigured()
+}
+
+func (p *AzureSpeechProvider) ttsConfigured() bool {
+	return strings.TrimSpace(p.APIKey) != "" && strings.TrimSpace(p.TTSURL) != ""
+}
+
 func (p *AzureSpeechProvider) HealthCheck(ctx context.Context) error {
-	if !p.Configured() {
+	if !p.ttsConfigured() {
 		return ErrProviderUnavailable
 	}
 	baseURL := strings.TrimRight(p.TTSURL, "/")
@@ -205,8 +262,84 @@ func (p *AzureSpeechProvider) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (p *AzureSpeechProvider) ProbeCapability(ctx context.Context, capability string) domain.ProviderCheck {
+	switch capability {
+	case "pronunciation_assessment":
+		return p.probePronunciation(ctx, capability)
+	case "text_to_speech":
+		return p.probeTTS(ctx, capability)
+	default:
+		return domain.ProviderCheck{Provider: "Azure Speech", Capability: capability, Status: "unhealthy", Error: "unsupported_capability"}
+	}
+}
+
+func (p *AzureSpeechProvider) probeTTS(ctx context.Context, capability string) domain.ProviderCheck {
+	check := startProbe("Azure Neural TTS", capability, p.Voice, p.ttsConfigured())
+	if !check.Configured {
+		return check
+	}
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(p.TTSURL, "/")+"/cognitiveservices/voices/list", nil)
+	if err != nil {
+		return finishProbeError(check, err)
+	}
+	req.Header.Set("Ocp-Apim-Subscription-Key", p.APIKey)
+	check, resp := doProbeRequest(check, client, req)
+	if resp == nil || !check.Healthy {
+		return check
+	}
+	defer resp.Body.Close()
+	var voices []struct {
+		ShortName string `json:"ShortName"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 2<<20)).Decode(&voices); err != nil {
+		return finishProbeError(check, err)
+	}
+	for _, voice := range voices {
+		if voice.ShortName == p.Voice {
+			return check
+		}
+	}
+	check.Healthy = false
+	check.Status = "unhealthy"
+	check.Error = "voice_unavailable"
+	return check
+}
+
+func (p *AzureSpeechProvider) probePronunciation(ctx context.Context, capability string) domain.ProviderCheck {
+	check := startProbe("Azure Pronunciation", capability, "azure-pronunciation-assessment", p.pronunciationConfigured())
+	if !check.Configured {
+		return check
+	}
+	assessmentPayload, err := json.Marshal(map[string]string{"ReferenceText": "test", "GradingSystem": "HundredMark", "Granularity": "Word", "Dimension": "Comprehensive"})
+	if err != nil {
+		return finishProbeError(check, err)
+	}
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	url := strings.TrimRight(p.STTURL, "/") + "/speech/recognition/conversation/cognitiveservices/v1?language=en-US&format=detailed"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(silentWAV()))
+	if err != nil {
+		return finishProbeError(check, err)
+	}
+	req.Header.Set("Ocp-Apim-Subscription-Key", p.APIKey)
+	req.Header.Set("Content-Type", "audio/wav")
+	req.Header.Set("Pronunciation-Assessment", base64.StdEncoding.EncodeToString(assessmentPayload))
+	req.Header.Set("Accept", "application/json")
+	check, resp := doProbeRequest(check, client, req)
+	if resp != nil {
+		resp.Body.Close()
+	}
+	return check
+}
+
 func (p *AzureSpeechProvider) Assess(ctx context.Context, audio []byte, mimeType, reference string) (PronunciationResult, error) {
-	if !p.Configured() {
+	if !p.pronunciationConfigured() {
 		return PronunciationResult{}, ErrProviderUnavailable
 	}
 	if len(audio) == 0 || len(audio) > maxAudioBytes {
@@ -272,7 +405,7 @@ func (p *AzureSpeechProvider) Assess(ctx context.Context, audio []byte, mimeType
 }
 
 func (p *AzureSpeechProvider) Synthesize(ctx context.Context, text, voice string) ([]byte, error) {
-	if !p.Configured() {
+	if !p.ttsConfigured() {
 		return nil, ErrProviderUnavailable
 	}
 	text = strings.TrimSpace(text)
@@ -311,6 +444,29 @@ func audioContentType(value string) string {
 		return value
 	}
 	return "audio/wav"
+}
+
+func silentWAV() []byte {
+	const sampleRate = 16000
+	const channels = 1
+	const bitsPerSample = 16
+	const sampleCount = sampleRate / 10
+	dataSize := sampleCount * channels * bitsPerSample / 8
+	wav := make([]byte, 44+dataSize)
+	copy(wav[0:4], "RIFF")
+	binary.LittleEndian.PutUint32(wav[4:8], uint32(len(wav)-8))
+	copy(wav[8:12], "WAVE")
+	copy(wav[12:16], "fmt ")
+	binary.LittleEndian.PutUint32(wav[16:20], 16)
+	binary.LittleEndian.PutUint16(wav[20:22], 1)
+	binary.LittleEndian.PutUint16(wav[22:24], channels)
+	binary.LittleEndian.PutUint32(wav[24:28], sampleRate)
+	binary.LittleEndian.PutUint32(wav[28:32], sampleRate*channels*bitsPerSample/8)
+	binary.LittleEndian.PutUint16(wav[32:34], channels*bitsPerSample/8)
+	binary.LittleEndian.PutUint16(wav[34:36], bitsPerSample)
+	copy(wav[36:40], "data")
+	binary.LittleEndian.PutUint32(wav[40:44], uint32(dataSize))
+	return wav
 }
 
 func providerHTTPError(name string, resp *http.Response) error {

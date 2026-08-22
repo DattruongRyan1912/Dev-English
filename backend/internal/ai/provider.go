@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
@@ -57,6 +58,13 @@ type Provider = LLMProvider
 // authenticated connectivity probe without consuming a generation quota.
 type HealthChecker interface {
 	HealthCheck(context.Context) error
+}
+
+// CapabilityProbe reports safe, capability-specific connectivity metadata.
+// Implementations must never include provider response bodies or credentials
+// in the returned error code.
+type CapabilityProbe interface {
+	ProbeCapability(context.Context, string) domain.ProviderCheck
 }
 
 type Transcript struct {
@@ -346,6 +354,7 @@ type DeepSeekProvider struct {
 	FastModel  string
 	SmartModel string
 	Client     *http.Client
+	configMu   sync.RWMutex
 }
 
 func NewDeepSeekFromEnv() *DeepSeekProvider {
@@ -365,10 +374,66 @@ func NewDeepSeekFromEnv() *DeepSeekProvider {
 }
 
 func (p *DeepSeekProvider) Name() string     { return "deepseek" }
-func (p *DeepSeekProvider) Configured() bool { return strings.TrimSpace(p.APIKey) != "" }
+func (p *DeepSeekProvider) Configured() bool { return strings.TrimSpace(p.apiKey()) != "" }
+
+func (p *DeepSeekProvider) apiKey() string {
+	p.configMu.RLock()
+	defer p.configMu.RUnlock()
+	return p.APIKey
+}
+
+func (p *DeepSeekProvider) models() (string, string) {
+	p.configMu.RLock()
+	defer p.configMu.RUnlock()
+	return p.FastModel, p.SmartModel
+}
+
+func (p *DeepSeekProvider) SetAPIKey(value string) {
+	p.configMu.Lock()
+	p.APIKey = strings.TrimSpace(value)
+	p.configMu.Unlock()
+}
+
+func (p *DeepSeekProvider) ClearAPIKey() {
+	p.SetAPIKey("")
+}
+
+func (p *DeepSeekProvider) SetModels(fast, smart string) error {
+	if err := ValidateModelName(fast); err != nil {
+		return fmt.Errorf("invalid DeepSeek fast model: %w", err)
+	}
+	if err := ValidateModelName(smart); err != nil {
+		return fmt.Errorf("invalid DeepSeek smart model: %w", err)
+	}
+	p.configMu.Lock()
+	p.FastModel = strings.TrimSpace(fast)
+	p.SmartModel = strings.TrimSpace(smart)
+	p.configMu.Unlock()
+	return nil
+}
+
+func ValidateModelName(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return errors.New("model is required")
+	}
+	if len(value) > 128 || strings.ContainsAny(value, "\r\n\t ") {
+		return errors.New("model contains invalid characters")
+	}
+	for index, char := range value {
+		if !(char >= 'a' && char <= 'z') && !(char >= 'A' && char <= 'Z') && !(char >= '0' && char <= '9') && char != '.' && char != '_' && char != '-' && char != ':' {
+			return errors.New("model contains invalid characters")
+		}
+		if index == 0 && (char == '.' || char == '_' || char == '-' || char == ':') {
+			return errors.New("model must start with a letter or number")
+		}
+	}
+	return nil
+}
 
 func (p *DeepSeekProvider) HealthCheck(ctx context.Context) error {
-	if !p.Configured() {
+	apiKey := p.apiKey()
+	if strings.TrimSpace(apiKey) == "" {
 		return ErrProviderUnavailable
 	}
 	client := p.Client
@@ -379,7 +444,7 @@ func (p *DeepSeekProvider) HealthCheck(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -392,17 +457,64 @@ func (p *DeepSeekProvider) HealthCheck(ctx context.Context) error {
 	return nil
 }
 
+func (p *DeepSeekProvider) ProbeCapability(ctx context.Context, capability string) domain.ProviderCheck {
+	fastModel, smartModel := p.models()
+	check := startProbe("DeepSeek", capability, "fast="+fastModel+",smart="+smartModel, p.Configured())
+	if !check.Configured {
+		return check
+	}
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(p.BaseURL, "/")+"/models", nil)
+	if err != nil {
+		return finishProbeError(check, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+p.apiKey())
+	check, resp := doProbeRequest(check, client, req)
+	if resp == nil || !check.Healthy {
+		return check
+	}
+	defer resp.Body.Close()
+	var payload struct {
+		Data []struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&payload); err != nil {
+		return finishProbeError(check, err)
+	}
+	available := make(map[string]struct{}, len(payload.Data))
+	for _, item := range payload.Data {
+		available[item.ID] = struct{}{}
+	}
+	if _, ok := available[fastModel]; !ok {
+		check.Healthy = false
+		check.Status = "unhealthy"
+		check.Error = "fast_model_unavailable"
+		return check
+	}
+	if _, ok := available[smartModel]; !ok {
+		check.Healthy = false
+		check.Status = "unhealthy"
+		check.Error = "smart_model_unavailable"
+	}
+	return check
+}
+
 func (p *DeepSeekProvider) GenerateMission(ctx context.Context, request MissionRequest) (domain.Mission, error) {
 	if !p.Configured() {
 		return domain.Mission{}, ErrProviderUnavailable
 	}
+	fastModel, _ := p.models()
 	system := "You are DevEnglish's mission generator. Return only valid JSON with title, mode, skill, skillLabel, level, context, prompt, targetVocabulary, expectedPoints, estimatedMinutes. Keep the mission practical for a developer."
 	user := fmt.Sprintf("Learning state: %+v\nWork context: %s", request.LearningState, request.WorkContext)
 	var result domain.Mission
 	var err error
 	for attempt := 0; attempt < 2; attempt++ {
 		result = domain.Mission{}
-		err = p.chatJSON(ctx, p.FastModel, system, user, &result)
+		err = p.chatJSON(ctx, fastModel, system, user, &result)
 		if err == nil {
 			err = validateMission(result)
 		}
@@ -423,13 +535,14 @@ func (p *DeepSeekProvider) EvaluateWriting(ctx context.Context, request WritingR
 	if !p.Configured() {
 		return domain.Evaluation{}, ErrProviderUnavailable
 	}
+	_, smartModel := p.models()
 	system := "You are a technical English evaluator. Return only valid JSON with score, summary, whatWasGood, mainIssue, nextAction, corrections, technicalPoints. Corrections must contain original, corrected, why, type, severity. Score is an observation only; do not invent missing evidence."
 	user := fmt.Sprintf("Mission: %+v\nLearner answer: %s", request.Mission, request.Answer)
 	var result domain.Evaluation
 	var err error
 	for attempt := 0; attempt < 2; attempt++ {
 		result = domain.Evaluation{}
-		err = p.chatJSON(ctx, p.SmartModel, system, user, &result)
+		err = p.chatJSON(ctx, smartModel, system, user, &result)
 		if err == nil {
 			err = validateEvaluation(result)
 		}
@@ -448,6 +561,7 @@ func (p *DeepSeekProvider) GenerateRoleplay(ctx context.Context, request Rolepla
 	if !p.Configured() {
 		return RoleplayResult{}, ErrProviderUnavailable
 	}
+	_, smartModel := p.models()
 	system := "You are a technical English roleplay partner. Return only JSON with reply and evaluation. The reply must ask one focused follow-up question. The evaluation must contain score, summary, whatWasGood, mainIssue, nextAction, corrections, technicalPoints."
 	user := fmt.Sprintf("Scenario: %+v\nConversation: %+v\nLearner answer: %s", request.Scenario, request.Conversation, request.Answer)
 	var output struct {
@@ -460,7 +574,7 @@ func (p *DeepSeekProvider) GenerateRoleplay(ctx context.Context, request Rolepla
 			Reply      string            `json:"reply"`
 			Evaluation domain.Evaluation `json:"evaluation"`
 		}{}
-		lastErr = p.chatJSON(ctx, p.SmartModel, system, user, &output)
+		lastErr = p.chatJSON(ctx, smartModel, system, user, &output)
 		if lastErr == nil && strings.TrimSpace(output.Reply) == "" {
 			lastErr = errors.New("roleplay provider returned an empty reply")
 		}
@@ -482,13 +596,14 @@ func (p *DeepSeekProvider) GenerateCopilot(ctx context.Context, request CopilotR
 	if !p.Configured() {
 		return domain.CopilotResult{}, ErrProviderUnavailable
 	}
+	fastModel, _ := p.models()
 	system := "You are a technical English copilot for developers. Return only JSON with simple, natural, professional and explanation. Preserve the requested meaning and do not invent technical facts."
 	user := fmt.Sprintf("Vietnamese request: %s\nWork context: %s", request.Vietnamese, request.Context)
 	var output domain.CopilotResult
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		output = domain.CopilotResult{}
-		lastErr = p.chatJSON(ctx, p.FastModel, system, user, &output)
+		lastErr = p.chatJSON(ctx, fastModel, system, user, &output)
 		if lastErr == nil && (strings.TrimSpace(output.Simple) == "" || strings.TrimSpace(output.Natural) == "" || strings.TrimSpace(output.Professional) == "") {
 			lastErr = errors.New("copilot provider returned incomplete output")
 		}
@@ -509,7 +624,7 @@ func (p *DeepSeekProvider) chatJSON(ctx context.Context, model, system, user str
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Authorization", "Bearer "+p.APIKey)
+	req.Header.Set("Authorization", "Bearer "+p.apiKey())
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := p.Client.Do(req)
 	if err != nil {

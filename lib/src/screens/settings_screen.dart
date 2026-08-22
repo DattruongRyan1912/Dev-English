@@ -14,10 +14,27 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  final _deepSeekKeyController = TextEditingController();
+  final _fastModelController = TextEditingController();
+  final _smartModelController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
-    widget.controller.loadSettingsData();
+    widget.controller.loadSettingsData().then((_) {
+      if (!mounted) return;
+      _fastModelController.text = widget.controller.settings.fastModel;
+      _smartModelController.text = widget.controller.settings.smartModel;
+      setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _deepSeekKeyController.dispose();
+    _fastModelController.dispose();
+    _smartModelController.dispose();
+    super.dispose();
   }
 
   Future<void> _signOut() async {
@@ -25,6 +42,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     Navigator.of(context).pop();
   }
+
+  Future<void> _saveDeepSeekKey() async {
+    final key = _deepSeekKeyController.text.trim();
+    if (key.isEmpty) return;
+    await widget.controller.setDeepSeekKey(key);
+    _deepSeekKeyController.clear();
+  }
+
+  Future<void> _saveModels() => widget.controller.saveModelSettings(
+    fastModel: _fastModelController.text,
+    smartModel: _smartModelController.text,
+  );
+
+  String _statusLabel(String status) => switch (status) {
+    'connected' => 'Connected',
+    'invalid' => 'Invalid',
+    _ => 'Not configured',
+  };
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -62,6 +97,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             Card(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DeepSeek API key',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Status: ${_statusLabel(widget.controller.settings.deepSeekStatus)}. The key is encrypted and retained only by the backend.',
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: _deepSeekKeyController,
+                      obscureText: true,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: const InputDecoration(
+                        labelText: 'New key / replacement key',
+                        hintText: 'Paste only over HTTPS or local development',
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Wrap(
+                      spacing: AppSpacing.sm,
+                      runSpacing: AppSpacing.sm,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _saveDeepSeekKey,
+                          icon: const Icon(Icons.save_outlined),
+                          label: Text(
+                            widget.controller.settings.deepSeekConfigured
+                                ? 'Replace'
+                                : 'Set',
+                          ),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed: widget.controller.testDeepSeekKey,
+                          icon: const Icon(Icons.network_check),
+                          label: const Text('Test'),
+                        ),
+                        OutlinedButton.icon(
+                          onPressed:
+                              widget.controller.settings.deepSeekConfigured
+                              ? widget.controller.removeDeepSeekKey
+                              : null,
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Remove'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Card(
               child: Column(
                 children: [
                   ListTile(
@@ -70,6 +164,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: const Text('Models & pronunciation'),
                     subtitle: Text(
                       'Fast: ${widget.controller.settings.fastModel}\nSmart: ${widget.controller.settings.smartModel}\nBudget: ${widget.controller.settings.monthlyBudgetVnd} VND / month',
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.lg,
+                    ),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _fastModelController,
+                          decoration: const InputDecoration(
+                            labelText: 'Fast model',
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        TextField(
+                          controller: _smartModelController,
+                          decoration: const InputDecoration(
+                            labelText: 'Smart model',
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: OutlinedButton(
+                            onPressed: _saveModels,
+                            child: const Text('Save models'),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   SwitchListTile.adaptive(

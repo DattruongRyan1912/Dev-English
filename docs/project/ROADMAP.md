@@ -2,13 +2,13 @@
 
 ## Phase 0 — Personal Go-Live RC1 hardening
 
-Status: **In progress — P0 batch partial**
+Status: **In progress — local P0 complete; deployment gates partial**
 
 - Remove fake runtime metrics from production responses.
 - Probe configured providers through real authenticated health requests.
 - Make production auth/database/login/CORS requirements fail closed.
 - Disable deterministic AI fallback and demo seeding in production.
-- Done locally: live provider probes, API-level voice chain, migration tracking and backup/restore rehearsal.
+- Done locally: live provider probes, encrypted Settings lifecycle, capability-specific probe tests, API-level voice chain, atomic writing persistence, migration tracking and guarded backup/restore rehearsal.
 - Remaining: browser microphone evidence, real HTTPS deployment and production deployment evidence.
 
 ## Phase 1 — Local foundation
@@ -22,19 +22,21 @@ Status: **Done**
 
 ## Phase 2 — Core learning loop
 
-Status: **In progress**
+Status: **In progress — text loop and live AI features verified**
 
 - Run and verify: diagnostic → daily mission → writing feedback → retry.
 - Persist mistake and vocabulary extraction.
 - Verify review scheduling and progress updates after a completed mission.
 - Verify live provider behavior for text, speech-to-text, pronunciation and TTS.
+- Remaining: real browser microphone capture and an explicit SRS review-state transition check.
 
 ## Phase 3 — Product hardening
 
 Status: **In progress — boundary controls added**
 
 - Add automated API integration tests for the core learning loop.
-- Add browser smoke tests for the four primary destinations.
+- Keep the writing outcome and PostgreSQL learning-state update atomic.
+- Add browser smoke tests for the four primary destinations. A manual smoke pass is complete; repeatable automation remains.
 - Improve loading, empty, provider-error and microphone-permission states.
 - Add usage/cost alerts and a repeatable local reset/seed workflow.
 

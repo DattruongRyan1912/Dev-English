@@ -193,6 +193,50 @@ func (s *PostgresStore) SaveWritingEvaluation(ctx context.Context, attempt domai
 	return err
 }
 
+func (s *PostgresStore) SaveWritingOutcome(ctx context.Context, outcome WritingOutcome) error {
+	raw, err := json.Marshal(outcome.Evaluation)
+	if err != nil {
+		return err
+	}
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	userID := UserID(ctx)
+	if _, err := tx.Exec(ctx, `INSERT INTO mission_attempts (id, mission_id, user_id, answer, score, submitted_at) VALUES ($1,$2,$3,$4,$5,$6)`, outcome.Attempt.ID, outcome.Attempt.MissionID, userID, outcome.Attempt.Answer, outcome.Attempt.Score, outcome.Attempt.SubmittedAt); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO writing_attempts (id, user_id, mission_id, answer, evaluation, created_at) VALUES ($1,$2,$3,$4,$5,$6)`, outcome.Attempt.ID, userID, outcome.Attempt.MissionID, outcome.Attempt.Answer, raw, outcome.Attempt.SubmittedAt); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO evaluations (id, user_id, attempt_id, feature, rubric, observation, final_score, created_at) VALUES ($1,$2,$3,'writing',$4,$5,$6,$7)`, "evaluation-"+outcome.Attempt.ID, userID, outcome.Attempt.ID, `{"grammar":20,"clarity":25,"naturalness":20,"technicalAccuracy":25,"vocabulary":10}`, raw, outcome.Evaluation.Score, outcome.Attempt.SubmittedAt); err != nil {
+		return err
+	}
+	missionResult, err := tx.Exec(ctx, `UPDATE missions SET status='completed', completed_at=$1 WHERE id=$2 AND user_id=$3`, outcome.CompletedAt, outcome.MissionID, userID)
+	if err != nil {
+		return err
+	}
+	if missionResult.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	for _, item := range outcome.Mistakes {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO mistakes (id, user_id, type, original, corrected, context, severity, frequency, last_seen, next_review, mastery)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+			ON CONFLICT (id) DO UPDATE SET corrected=EXCLUDED.corrected, context=EXCLUDED.context,
+				severity=EXCLUDED.severity, frequency=mistakes.frequency+1, last_seen=EXCLUDED.last_seen,
+				next_review=EXCLUDED.next_review, mastery=EXCLUDED.mastery
+				WHERE mistakes.user_id=EXCLUDED.user_id`, item.ID, userID, item.Type, item.Original, item.Corrected, item.Context, item.Severity, item.Frequency, item.LastSeen, item.NextReview, item.Mastery); err != nil {
+			return err
+		}
+	}
+	if err := updateSkillTx(ctx, tx, userID, outcome.Skill, outcome.SkillDelta); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *PostgresStore) Mistakes(ctx context.Context, now time.Time) ([]domain.Mistake, error) {
 	return s.queryMistakes(ctx, `SELECT id, type, original, corrected, context, severity, frequency, last_seen, next_review, mastery FROM mistakes WHERE user_id = $1 AND next_review <= $2 ORDER BY next_review`, UserID(ctx), now)
 }
@@ -374,7 +418,7 @@ func (s *PostgresStore) AllWorkContexts(ctx context.Context) ([]domain.WorkConte
 
 func (s *PostgresStore) Settings(ctx context.Context) (domain.Settings, error) {
 	var settings domain.Settings
-	err := s.Pool.QueryRow(ctx, `SELECT ai_provider, fast_model, smart_model, deepseek_configured, speech_configured, pronunciation_on, monthly_budget_vnd FROM user_settings WHERE user_id = $1`, UserID(ctx)).Scan(&settings.AIProvider, &settings.FastModel, &settings.SmartModel, &settings.DeepSeekConfigured, &settings.SpeechConfigured, &settings.PronunciationOn, &settings.MonthlyBudgetVND)
+	err := s.Pool.QueryRow(ctx, `SELECT ai_provider, fast_model, smart_model, deepseek_configured, deepseek_status, speech_configured, pronunciation_on, monthly_budget_vnd FROM user_settings WHERE user_id = $1`, UserID(ctx)).Scan(&settings.AIProvider, &settings.FastModel, &settings.SmartModel, &settings.DeepSeekConfigured, &settings.DeepSeekStatus, &settings.SpeechConfigured, &settings.PronunciationOn, &settings.MonthlyBudgetVND)
 	if err != nil {
 		return domain.Settings{}, mapPGError(err)
 	}
@@ -383,14 +427,42 @@ func (s *PostgresStore) Settings(ctx context.Context) (domain.Settings, error) {
 
 func (s *PostgresStore) SaveSettings(ctx context.Context, settings domain.Settings) error {
 	_, err := s.Pool.Exec(ctx, `
-		INSERT INTO user_settings (user_id, ai_provider, fast_model, smart_model, deepseek_configured, speech_configured, pronunciation_on, monthly_budget_vnd)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		INSERT INTO user_settings (user_id, ai_provider, fast_model, smart_model, deepseek_configured, deepseek_status, speech_configured, pronunciation_on, monthly_budget_vnd)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT (user_id) DO UPDATE SET ai_provider=EXCLUDED.ai_provider, fast_model=EXCLUDED.fast_model,
 			smart_model=EXCLUDED.smart_model, deepseek_configured=EXCLUDED.deepseek_configured,
+			deepseek_status=EXCLUDED.deepseek_status,
 			speech_configured=EXCLUDED.speech_configured, pronunciation_on=EXCLUDED.pronunciation_on,
 			monthly_budget_vnd=EXCLUDED.monthly_budget_vnd`,
-		UserID(ctx), settings.AIProvider, settings.FastModel, settings.SmartModel, settings.DeepSeekConfigured, settings.SpeechConfigured, settings.PronunciationOn, settings.MonthlyBudgetVND,
+		UserID(ctx), settings.AIProvider, settings.FastModel, settings.SmartModel, settings.DeepSeekConfigured, settings.DeepSeekStatus, settings.SpeechConfigured, settings.PronunciationOn, settings.MonthlyBudgetVND,
 	)
+	return err
+}
+
+func (s *PostgresStore) DeepSeekSecret(ctx context.Context) (EncryptedSecret, error) {
+	var secret EncryptedSecret
+	err := s.Pool.QueryRow(ctx, `SELECT ciphertext, nonce FROM provider_secrets WHERE user_id=$1 AND provider='deepseek'`, UserID(ctx)).Scan(&secret.Ciphertext, &secret.Nonce)
+	if err != nil {
+		return EncryptedSecret{}, mapPGError(err)
+	}
+	return secret, nil
+}
+
+func (s *PostgresStore) SaveDeepSeekSecret(ctx context.Context, secret EncryptedSecret) error {
+	if len(secret.Ciphertext) == 0 || len(secret.Nonce) == 0 {
+		return errors.New("encrypted DeepSeek secret is required")
+	}
+	_, err := s.Pool.Exec(ctx, `
+		INSERT INTO provider_secrets (user_id, provider, ciphertext, nonce, updated_at)
+		VALUES ($1,'deepseek',$2,$3,now())
+		ON CONFLICT (user_id, provider) DO UPDATE SET ciphertext=EXCLUDED.ciphertext, nonce=EXCLUDED.nonce, updated_at=now()`,
+		UserID(ctx), secret.Ciphertext, secret.Nonce,
+	)
+	return err
+}
+
+func (s *PostgresStore) DeleteDeepSeekSecret(ctx context.Context) error {
+	_, err := s.Pool.Exec(ctx, `DELETE FROM provider_secrets WHERE user_id=$1 AND provider='deepseek'`, UserID(ctx))
 	return err
 }
 
@@ -423,16 +495,31 @@ func (s *PostgresStore) CompleteMission(ctx context.Context, id string, complete
 }
 
 func (s *PostgresStore) UpdateSkill(ctx context.Context, skill string, delta float64) error {
-	state, err := s.LearningState(ctx)
+	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
 		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := updateSkillTx(ctx, tx, UserID(ctx), skill, delta); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
+func updateSkillTx(ctx context.Context, tx pgx.Tx, userID, skill string, delta float64) error {
+	var raw []byte
+	if err := tx.QueryRow(ctx, `SELECT state FROM learning_state WHERE user_id=$1 FOR UPDATE`, userID).Scan(&raw); err != nil {
+		return mapPGError(err)
+	}
+	var state domain.LearningState
+	if err := json.Unmarshal(raw, &state); err != nil {
+		return fmt.Errorf("decode learning state: %w", err)
 	}
 	for index := range state.Skills {
 		if state.Skills[index].Skill == skill {
 			state.Skills[index].Score = clampScore(state.Skills[index].Score + delta)
 			if delta > 0 {
 				state.Skills[index].Trend += delta
-
 			}
 		}
 	}
@@ -441,21 +528,14 @@ func (s *PostgresStore) UpdateSkill(ctx context.Context, skill string, delta flo
 	if err != nil {
 		return err
 	}
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE skill_profiles SET score=LEAST(100, GREATEST(0, score+$1)), trend=trend+GREATEST(0,$1), updated_at=now() WHERE user_id=$2 AND skill=$3`, delta, userID, skill); err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
-	if _, err := tx.Exec(ctx, `UPDATE skill_profiles SET score=LEAST(100, GREATEST(0, score+$1)), trend=trend+GREATEST(0,$1), updated_at=now() WHERE user_id=$2 AND skill=$3`, delta, UserID(ctx), skill); err != nil {
+	if _, err := tx.Exec(ctx, `UPDATE learning_state SET state=$1, updated_at=now() WHERE user_id=$2`, raw, userID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE learning_state SET state=$1, updated_at=now() WHERE user_id=$2`, raw, UserID(ctx)); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(ctx, `INSERT INTO skill_history (user_id, date_key, score) VALUES ($1, $2, $3) ON CONFLICT (user_id,date_key) DO UPDATE SET score=EXCLUDED.score`, UserID(ctx), time.Now().UTC().Format("2006-01-02"), state.OverallScore); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+	_, err = tx.Exec(ctx, `INSERT INTO skill_history (user_id, date_key, score) VALUES ($1, $2, $3) ON CONFLICT (user_id,date_key) DO UPDATE SET score=EXCLUDED.score`, userID, time.Now().UTC().Format("2006-01-02"), state.OverallScore)
+	return err
 }
 
 func (s *PostgresStore) SaveDiagnostic(ctx context.Context, result domain.DiagnosticResult) error {

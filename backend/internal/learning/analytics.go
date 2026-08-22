@@ -13,15 +13,21 @@ import (
 
 func (s *Service) TestConnections(ctx context.Context) []domain.ProviderCheck {
 	checks := make([]domain.ProviderCheck, 0, 4)
-	if s.AI != nil && s.AI.Name() == "deterministic-fallback" {
+	if s.DeepSeekSecrets != nil {
+		_, check, err := s.DeepSeekSecrets.Test(ctx)
+		if err != nil {
+			check = domain.ProviderCheck{Provider: "DeepSeek", Status: "unhealthy"}
+		}
+		checks = append(checks, check)
+	} else if s.AI != nil && s.AI.Name() == "deterministic-fallback" {
 		checks = append(checks, domain.ProviderCheck{Provider: "DeepSeek", Status: "fallback"})
 	} else {
-		checks = append(checks, checkProvider(ctx, "DeepSeek", s.AI))
+		checks = append(checks, checkProvider(ctx, "DeepSeek", "text_generation", s.AI))
 	}
 	checks = append(checks,
-		checkProvider(ctx, "Groq Whisper", s.STT),
-		checkProvider(ctx, "Azure Pronunciation", s.Pronunciation),
-		checkProvider(ctx, "Azure Neural TTS", s.TTS),
+		checkProvider(ctx, "Groq Whisper", "speech_to_text", s.STT),
+		checkProvider(ctx, "Azure Pronunciation", "pronunciation_assessment", s.Pronunciation),
+		checkProvider(ctx, "Azure Neural TTS", "text_to_speech", s.TTS),
 	)
 	return checks
 }
@@ -35,13 +41,20 @@ type namedProvider interface {
 	Configured() bool
 }
 
-func checkProvider(ctx context.Context, name string, provider namedProvider) domain.ProviderCheck {
+func checkProvider(ctx context.Context, name, capability string, provider namedProvider) domain.ProviderCheck {
+	if probe, ok := provider.(ai.CapabilityProbe); ok {
+		check := probe.ProbeCapability(ctx, capability)
+		check.Provider = name
+		return check
+	}
 	check := domain.ProviderCheck{Provider: name}
 	if provider == nil || !provider.Configured() {
 		check.Status = "not_configured"
+		check.Capability = capability
 		return check
 	}
 	check.Configured = true
+	check.Capability = capability
 	checker, ok := provider.(ai.HealthChecker)
 	if !ok {
 		check.Status = "unhealthy"

@@ -174,6 +174,7 @@ type Settings struct {
 	FastModel          string `json:"fastModel"`
 	SmartModel         string `json:"smartModel"`
 	DeepSeekConfigured bool   `json:"deepSeekConfigured"`
+	DeepSeekStatus     string `json:"deepSeekStatus"`
 	SpeechConfigured   bool   `json:"speechConfigured"`
 	PronunciationOn    bool   `json:"pronunciationOn"`
 	MonthlyBudgetVND   int    `json:"monthlyBudgetVnd"`
@@ -188,7 +189,13 @@ type ProviderStatus struct {
 type ProviderCheck struct {
 	Provider   string `json:"provider"`
 	Configured bool   `json:"configured"`
+	Reachable  bool   `json:"reachable"`
+	Healthy    bool   `json:"healthy"`
+	Capability string `json:"capability"`
+	Model      string `json:"model"`
+	LatencyMs  int64  `json:"latencyMs"`
 	Status     string `json:"status"`
+	Error      string `json:"error,omitempty"`
 }
 
 type WorkImportResult struct {

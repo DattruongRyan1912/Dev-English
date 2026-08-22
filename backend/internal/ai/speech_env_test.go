@@ -19,3 +19,13 @@ func TestNewAzureSpeechFromEnvBuildsRegionalEndpoints(t *testing.T) {
 		t.Fatal("provider should be configured")
 	}
 }
+
+func TestAzureSpeechCapabilitiesAreIndependent(t *testing.T) {
+	provider := &AzureSpeechProvider{APIKey: "azure-key", TTSURL: "https://tts.example"}
+	if provider.PronunciationConfigured() {
+		t.Fatal("pronunciation should require an STT endpoint")
+	}
+	if !provider.TTSConfigured() {
+		t.Fatal("TTS should be configured with a TTS endpoint")
+	}
+}

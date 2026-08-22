@@ -58,6 +58,22 @@ class DevEnglishApi {
         }),
       );
 
+  Future<SettingsData> setDeepSeekKey(String apiKey) async =>
+      SettingsData.fromJson(
+        _map(
+          (await _put('/api/v1/settings/deepseek', {
+            'apiKey': apiKey,
+          }))['settings'],
+        ),
+      );
+
+  Future<SettingsData> testDeepSeekKey() async => SettingsData.fromJson(
+    _map((await _post('/api/v1/settings/deepseek/test', {}))['settings']),
+  );
+
+  Future<SettingsData> removeDeepSeekKey() async =>
+      SettingsData.fromJson(await _delete('/api/v1/settings/deepseek'));
+
   Future<List<PracticeMode>> practice() async {
     final json = await _get('/api/v1/practice');
     return _list(json['modes']).map(PracticeMode.fromJson).toList();
@@ -264,6 +280,13 @@ class DevEnglishApi {
           headers: _headers({'content-type': 'application/json'}),
           body: jsonEncode(body),
         )
+        .timeout(const Duration(seconds: 10));
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> _delete(String path) async {
+    final response = await _client
+        .delete(Uri.parse('$baseUrl$path'), headers: _headers())
         .timeout(const Duration(seconds: 10));
     return _decode(response);
   }
