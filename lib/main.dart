@@ -21,7 +21,9 @@ void main() {
 }
 
 class DevEnglishApp extends StatefulWidget {
-  const DevEnglishApp({super.key});
+  const DevEnglishApp({super.key, this.controller});
+
+  final AppController? controller;
 
   @override
   State<DevEnglishApp> createState() => _DevEnglishAppState();
@@ -29,16 +31,19 @@ class DevEnglishApp extends StatefulWidget {
 
 class _DevEnglishAppState extends State<DevEnglishApp> {
   late final AppController _controller;
+  late final bool _ownsController;
 
   @override
   void initState() {
     super.initState();
-    _controller = AppController()..load();
+    _ownsController = widget.controller == null;
+    _controller = widget.controller ?? AppController();
+    _controller.load();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    if (_ownsController) _controller.dispose();
     super.dispose();
   }
 

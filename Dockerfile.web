@@ -1,0 +1,22 @@
+FROM ghcr.io/cirruslabs/flutter:3.41.8 AS build
+
+WORKDIR /src
+
+COPY pubspec.yaml pubspec.lock ./
+RUN flutter pub get
+
+COPY analysis_options.yaml ./
+COPY lib ./lib
+COPY web ./web
+
+ARG API_BASE_URL
+RUN test -n "$API_BASE_URL"
+RUN flutter build web \
+    --release \
+    --dart-define=DEVENGLISH_ENV=production \
+    --dart-define=API_BASE_URL="$API_BASE_URL"
+
+FROM caddy:2-alpine
+
+COPY --from=build /src/build/web /srv
+COPY infra/Caddyfile.production /etc/caddy/Caddyfile

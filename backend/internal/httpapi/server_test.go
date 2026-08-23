@@ -34,6 +34,18 @@ func TestHomeEndpointReturnsLearningState(t *testing.T) {
 	}
 }
 
+func TestReadyEndpointReturnsReady(t *testing.T) {
+	request := httptest.NewRequest(http.MethodGet, "/readyz", nil)
+	response := httptest.NewRecorder()
+	testServer().ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("got status %d, want 200", response.Code)
+	}
+	if !strings.Contains(response.Body.String(), `"status":"ready"`) {
+		t.Fatalf("readiness response did not contain ready status: %s", response.Body.String())
+	}
+}
+
 func TestConfiguredCORSRejectsUnknownOrigins(t *testing.T) {
 	memory := store.NewSeeded(time.Now().UTC())
 	service := learning.NewService(memory, ai.DeterministicProvider{})

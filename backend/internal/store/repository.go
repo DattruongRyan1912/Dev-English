@@ -27,6 +27,7 @@ func UserID(ctx context.Context) string {
 // local seeded store and PostgreSQL implement the same contract so learning
 // rules do not depend on storage details.
 type Repository interface {
+	Ready(context.Context) error
 	EnsureUser(context.Context, domain.User) error
 	User(context.Context) (domain.User, error)
 	LearningState(context.Context) (domain.LearningState, error)

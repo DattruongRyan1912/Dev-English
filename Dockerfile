@@ -11,7 +11,9 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 
 FROM alpine:3.22
 
-RUN addgroup -S devenglish && adduser -S -G devenglish devenglish
+RUN apk add --no-cache ca-certificates wget \
+    && addgroup -S devenglish \
+    && adduser -S -G devenglish devenglish
 WORKDIR /app
 COPY --from=build /out/devenglish-server ./devenglish-server
 
