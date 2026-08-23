@@ -15,16 +15,23 @@ class AuthRequiredException implements Exception {
 }
 
 class DevEnglishApi {
-  DevEnglishApi({http.Client? client, String? baseUrl})
-    : _client = client ?? createHttpClient(),
-      baseUrl =
-          baseUrl ??
-          const String.fromEnvironment(
-            'API_BASE_URL',
-            defaultValue: 'http://localhost:8080',
-          );
+  static const defaultWorkContextTimeout = Duration(seconds: 90);
+
+  DevEnglishApi({
+    http.Client? client,
+    String? baseUrl,
+    Duration? workContextTimeout,
+  }) : _client = client ?? createHttpClient(),
+       _workContextTimeout = workContextTimeout ?? defaultWorkContextTimeout,
+       baseUrl =
+           baseUrl ??
+           const String.fromEnvironment(
+             'API_BASE_URL',
+             defaultValue: 'http://localhost:8080',
+           );
 
   final http.Client _client;
+  final Duration _workContextTimeout;
   final String baseUrl;
   void Function()? onUnauthorized;
 
@@ -237,7 +244,7 @@ class DevEnglishApi {
       'sourceType': sourceType,
       'title': title,
       'content': content,
-    }, timeout: const Duration(seconds: 90)),
+    }, timeout: _workContextTimeout),
   );
 
   Future<WorkImportResult> importGitHub(String url) async =>

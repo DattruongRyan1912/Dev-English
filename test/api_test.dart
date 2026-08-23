@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:devenglish/src/api.dart';
@@ -34,6 +35,12 @@ class _RecordingClient extends http.BaseClient {
   }
 }
 
+class _HangingClient extends http.BaseClient {
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) =>
+      Completer<http.StreamedResponse>().future;
+}
+
 void main() {
   test('importWork posts the work context and decodes the mission', () async {
     final client = _RecordingClient();
@@ -52,6 +59,27 @@ void main() {
     expect(
       jsonDecode(client.lastRequest!.body)['content'],
       'The API returns HTTP 500 after a database timeout.',
+    );
+  });
+
+  test('importWork uses the explicit long-running timeout policy', () async {
+    expect(
+      DevEnglishApi.defaultWorkContextTimeout,
+      const Duration(seconds: 90),
+    );
+    final api = DevEnglishApi(
+      client: _HangingClient(),
+      baseUrl: 'http://localhost:8080',
+      workContextTimeout: const Duration(milliseconds: 25),
+    );
+
+    await expectLater(
+      api.importWork(
+        sourceType: 'error',
+        title: 'API timeout',
+        content: 'The API returns HTTP 500 after a database timeout.',
+      ),
+      throwsA(isA<TimeoutException>()),
     );
   });
 }

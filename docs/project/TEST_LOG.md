@@ -269,3 +269,23 @@ Verified locally against the running PostgreSQL/pgvector container:
 - `DEVENGLISH_TEST_DATABASE_URL=... go test ./backend/internal/store -run '^TestPostgresRepositoryIntegration$' -count=1` — passed.
 - The test verified per-user mission isolation, persisted mission completion, persisted mistake extraction, learning-state/skill update and cleanup of disposable users.
 - `go test ./...`, `go test -race ./...`, `go vet ./...`, `git diff --check` and shell syntax checks — passed.
+
+## 2026-08-23 — PR #1 review follow-up: backend-aware Chrome smoke and migration runner
+
+Implemented:
+
+- Added an injectable `AppController` to the Flutter root so the browser smoke can inspect the same state that the rendered screens use without changing production ownership or disposal behavior.
+- Changed the Chrome smoke from demo-only navigation to a backend-backed check. It requires the generated mission from PostgreSQL, verifies Practice/Review/Progress data, and fails when the backend silently falls back to demo data.
+- Used Flutter's integration-test binding only for the explicitly enabled Chrome smoke so real browser HTTP requests are allowed; ordinary `flutter test` remains demo-safe and keeps the smoke skipped.
+- Made the Work Context 90-second timeout an explicit API policy and added a short injected timeout regression test that proves a hanging request is interrupted.
+- Added a disposable Compose PostgreSQL definition and `scripts/db_migrate_test.sh`, which invokes the tracked `scripts/db_migrate.sh`, checks first-run application, second-run idempotency and transactional rollback of a failing migration.
+- Updated CI so the Flutter job starts a disposable backend for the Chrome smoke and the PostgreSQL job exercises the actual migration runner before the repository integration test.
+
+Local checks:
+
+- `flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_BROWSER_SMOKE=true --dart-define=INTEGRATION_TEST_SHOULD_REPORT_RESULTS_TO_NATIVE=false --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://127.0.0.1:18081` — passed against a disposable PostgreSQL-backed Go backend.
+- `COMPOSE_FILE=infra/docker-compose.ci.yml COMPOSE_PROJECT_NAME=devenglish-ci POSTGRES_SERVICE=postgres POSTGRES_USER=devenglish POSTGRES_DB=devenglish ./scripts/db_migrate_test.sh` — passed: all tracked migrations applied, rerun was idempotent and the failing fixture left no table or migration record.
+
+Release boundary:
+
+- RC1 P4 remains `PARTIAL` while PR #1 is awaiting independent review and merge. UsageGuard is intentionally not included in this PR.

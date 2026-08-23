@@ -22,30 +22,6 @@ jobs:
 
   flutter:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.41.8'
-          channel: stable
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-      - run: flutter test test/browser_smoke_test.dart -d chrome
-      - run: flutter test --dart-define=DEVENGLISH_ENV=production
-      - run: flutter build web --release
-
-  production:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet
-      - run: docker build --file Dockerfile --tag devenglish-backend:ci .
-      - run: docker build --file Dockerfile.web --build-arg API_BASE_URL=https://english.example.com --tag devenglish-web:ci .
-      - run: docker run --rm -e DEVENGLISH_DOMAIN=english.example.com -e DEVENGLISH_TLS_EMAIL=ops@example.com devenglish-web:ci caddy validate --config /etc/caddy/Caddyfile
-
-  postgres:
-    runs-on: ubuntu-latest
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -65,18 +41,84 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.8'
+          channel: stable
       - name: Install PostgreSQL client
         run: |
           sudo apt-get update
           sudo apt-get install --yes postgresql-client
-      - name: Apply versioned migrations
+      - name: Prepare disposable backend database
         env:
           PGPASSWORD: devenglish-ci
         run: |
           for migration in infra/migrations/*.sql; do
             psql --host=127.0.0.1 --port=5432 --username=devenglish --dbname=devenglish --set=ON_ERROR_STOP=1 --file="$migration"
           done
+      - name: Start backend for Chrome smoke
+        env:
+          DATABASE_URL: postgres://devenglish:devenglish-ci@127.0.0.1:5432/devenglish?sslmode=disable
+          DEVENGLISH_ENV: development
+          PORT: 8080
+        run: |
+          nohup go run ./backend/cmd/server >/tmp/devenglish-backend.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz >/dev/null; then
+              curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          sed -n '1,240p' /tmp/devenglish-backend.log
+          exit 1
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
+      - run: flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_BROWSER_SMOKE=true --dart-define=INTEGRATION_TEST_SHOULD_REPORT_RESULTS_TO_NATIVE=false --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://127.0.0.1:8080
+      - run: flutter test --dart-define=DEVENGLISH_ENV=production
+      - run: flutter build web --release
+
+  production:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet
+      - run: docker build --file Dockerfile --tag devenglish-backend:ci .
+      - run: docker build --file Dockerfile.web --build-arg API_BASE_URL=https://english.example.com --tag devenglish-web:ci .
+      - run: docker run --rm -e DEVENGLISH_DOMAIN=english.example.com -e DEVENGLISH_TLS_EMAIL=ops@example.com devenglish-web:ci caddy validate --config /etc/caddy/Caddyfile
+
+  postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Start disposable PostgreSQL
+        run: docker compose -p devenglish-ci -f infra/docker-compose.ci.yml up -d postgres
+      - name: Wait for PostgreSQL
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker compose -p devenglish-ci -f infra/docker-compose.ci.yml exec -T postgres pg_isready -U devenglish -d devenglish; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose -p devenglish-ci -f infra/docker-compose.ci.yml logs postgres
+          exit 1
+      - name: Exercise migration runner
+        env:
+          COMPOSE_FILE: infra/docker-compose.ci.yml
+          COMPOSE_PROJECT_NAME: devenglish-ci
+          POSTGRES_SERVICE: postgres
+          POSTGRES_USER: devenglish
+          POSTGRES_DB: devenglish
+        run: ./scripts/db_migrate_test.sh
       - name: Run PostgreSQL repository integration test
         env:
           DEVENGLISH_TEST_DATABASE_URL: postgres://devenglish:devenglish-ci@127.0.0.1:5432/devenglish?sslmode=disable
         run: go test ./backend/internal/store -run '^TestPostgresRepositoryIntegration$' -count=1
+      - name: Stop disposable PostgreSQL
+        if: always()
+        run: docker compose -p devenglish-ci -f infra/docker-compose.ci.yml down -v
