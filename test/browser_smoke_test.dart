@@ -1,5 +1,6 @@
 import 'package:devenglish/main.dart';
 import 'package:devenglish/src/app_controller.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
@@ -25,44 +26,25 @@ void main() {
         isFalse,
         reason: 'The browser smoke must fail when the backend is unavailable.',
       );
-      expect(
-        controller.home.mission.title,
-        'Explain a technical problem clearly',
-      );
-      expect(controller.home.mission.id, startsWith('mission-generated-'));
-      expect(find.text("Today's mission"), findsOneWidget);
-      expect(find.text(controller.home.mission.title), findsOneWidget);
+      expect(find.text('Today'), findsWidgets);
+      expect(find.text('Ask your assistant'), findsOneWidget);
 
-      await tester.tap(find.text('Practice'));
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(
-        find.text('Choose one clear task. Keep the session moving.'),
-        findsOneWidget,
-      );
-      expect(find.text(controller.practice.first.title), findsOneWidget);
+      await tester.tap(find.text('Learning'));
+      await tester.pumpAndSettle();
+      expect(find.text('Choose a focused practice'), findsOneWidget);
 
-      await tester.tap(find.text('Review'));
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(
-        find.text('Due items first. Try before you reveal the answer.'),
-        findsOneWidget,
-      );
-      if (controller.review.isEmpty) {
-        expect(find.text('You are up to date'), findsOneWidget);
-      } else {
-        expect(find.text(controller.review.first.prompt), findsOneWidget);
-      }
+      await tester.tap(find.text('Work'));
+      await tester.pumpAndSettle();
+      expect(find.text('Projects'), findsOneWidget);
+      expect(find.text('Open tasks'), findsOneWidget);
 
-      await tester.tap(find.text('Progress'));
-      await tester.pump(const Duration(milliseconds: 500));
-      expect(
-        find.text('Trends that help you choose the next useful practice.'),
-        findsOneWidget,
-      );
-      expect(
-        find.text(controller.progress.state.skills.first.label),
-        findsOneWidget,
-      );
+      await tester.tap(find.byIcon(Icons.library_books_outlined));
+      await tester.pumpAndSettle();
+      expect(find.text('Connected sources'), findsOneWidget);
+
+      await tester.tap(find.text('Learning'));
+      await tester.pumpAndSettle();
+      expect(find.text('Choose a focused practice'), findsOneWidget);
     },
     skip: !const bool.fromEnvironment('DEVENGLISH_BROWSER_SMOKE'),
   );

@@ -10,14 +10,28 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 const (
-	DefaultTokenTTL  = 90 * 24 * time.Hour
-	tokenIDBytes     = 16
-	tokenSecretBytes = 32
-	tokenPrefix      = "mcp_"
+	DefaultTokenTTL        = 90 * 24 * time.Hour
+	tokenIDBytes           = 16
+	tokenSecretBytes       = 32
+	tokenPrefix            = "mcp_"
+	maxTokenIdentityLength = 256
 )
+
+// ErrInvalidTokenIdentity is returned when an application-bound MCP token is
+// issued without a complete, control-safe workspace/user identity.
+var ErrInvalidTokenIdentity = errors.New("invalid MCP token identity")
+
+// TokenIdentity is the canonical application identity bound to an MCP token.
+// It contains no bearer secret and is copied into the verified Principal.
+type TokenIdentity struct {
+	WorkspaceID string
+	UserID      string
+}
 
 // TokenStoreOption configures a TokenStore. The clock and random source are
 // injectable only to make expiry and issuance tests deterministic.
@@ -48,10 +62,12 @@ func WithTokenRandom(random io.Reader) TokenStoreOption {
 }
 
 type tokenRecord struct {
-	digest    [sha256.Size]byte
-	scopes    []Scope
-	expiresAt time.Time
-	revoked   bool
+	digest      [sha256.Size]byte
+	scopes      []Scope
+	expiresAt   time.Time
+	revoked     bool
+	workspaceID string
+	userID      string
 }
 
 // TokenStore stores only a digest of the bearer secret. The clear token is
@@ -123,6 +139,20 @@ func (issued *IssuedToken) Reveal() (string, error) {
 // Issue creates a token with the supplied allow-listed scopes. The returned
 // token secret is not persisted in clear text.
 func (store *TokenStore) Issue(scopes []Scope) (IssuedToken, error) {
+	return store.issue(scopes, TokenIdentity{})
+}
+
+// IssueForIdentity creates an application-bound token. The lower-level Issue
+// API remains available for protocol-only callers that do not need an
+// application identity.
+func (store *TokenStore) IssueForIdentity(scopes []Scope, identity TokenIdentity) (IssuedToken, error) {
+	if err := validateTokenIdentity(identity); err != nil {
+		return IssuedToken{}, err
+	}
+	return store.issue(scopes, identity)
+}
+
+func (store *TokenStore) issue(scopes []Scope, identity TokenIdentity) (IssuedToken, error) {
 	normalized, err := ParseScopeList(scopeStrings(scopes))
 	if err != nil {
 		return IssuedToken{}, err
@@ -148,9 +178,11 @@ func (store *TokenStore) Issue(scopes []Scope) (IssuedToken, error) {
 			continue
 		}
 		store.tokens[id] = tokenRecord{
-			digest:    digest,
-			scopes:    append([]Scope(nil), normalized...),
-			expiresAt: expiresAt,
+			digest:      digest,
+			scopes:      append([]Scope(nil), normalized...),
+			expiresAt:   expiresAt,
+			workspaceID: identity.WorkspaceID,
+			userID:      identity.UserID,
 		}
 		store.mu.Unlock()
 
@@ -176,9 +208,11 @@ func (store *TokenStore) IssueString(scopeString string) (IssuedToken, error) {
 // Principal is the identity and permission set attached to one MCP request.
 // It never contains the bearer secret.
 type Principal struct {
-	TokenID   string
-	Scopes    []Scope
-	ExpiresAt time.Time
+	TokenID     string
+	Scopes      []Scope
+	ExpiresAt   time.Time
+	WorkspaceID string
+	UserID      string
 }
 
 func (principal Principal) HasScope(scope Scope) bool {
@@ -231,10 +265,56 @@ func (store *TokenStore) Verify(token string, now time.Time) (Principal, error) 
 		return Principal{}, ErrTokenExpired
 	}
 	return Principal{
-		TokenID:   id,
-		Scopes:    append([]Scope(nil), record.scopes...),
-		ExpiresAt: record.expiresAt,
+		TokenID:     id,
+		Scopes:      append([]Scope(nil), record.scopes...),
+		ExpiresAt:   record.expiresAt,
+		WorkspaceID: record.workspaceID,
+		UserID:      record.userID,
 	}, nil
+}
+
+func validateTokenIdentity(identity TokenIdentity) error {
+	if !validTokenIdentityPart(identity.WorkspaceID) || !validTokenIdentityPart(identity.UserID) {
+		return ErrInvalidTokenIdentity
+	}
+	return nil
+}
+
+func validTokenIdentityPart(value string) bool {
+	return validMCPIdentifier(value, maxTokenIdentityLength, true)
+}
+
+// validMCPIdentifier is the strict identity contract shared by token
+// issuance and application argument validation. Downstream services treat
+// workspace/user/entity identifiers as trimmed, non-whitespace values and the
+// assistant additionally rejects all Unicode control characters; the MCP
+// boundary must reject the same values before any dependency is called.
+func validMCPIdentifier(value string, maxBytes int, required bool) bool {
+	if !required && value == "" {
+		return true
+	}
+	if value == "" || len(value) > maxBytes || !utf8.ValidString(value) || strings.TrimSpace(value) != value {
+		return false
+	}
+	for _, r := range value {
+		if unicode.IsSpace(r) || unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
+}
+
+func hasMCPDisallowedControl(value string, allowTextControls bool) bool {
+	for _, r := range value {
+		if !unicode.IsControl(r) {
+			continue
+		}
+		if allowTextControls && (r == '\n' || r == '\r' || r == '\t') {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func (store *TokenStore) VerifyAuthorization(header string, now time.Time) (Principal, error) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' as http_parser;
 
 import 'http_client.dart';
 import 'models.dart';
@@ -21,8 +22,10 @@ class DevEnglishApi {
     http.Client? client,
     String? baseUrl,
     Duration? workContextTimeout,
+    Duration? speechTimeout,
   }) : _client = client ?? createHttpClient(),
        _workContextTimeout = workContextTimeout ?? defaultWorkContextTimeout,
+       _speechTimeout = speechTimeout ?? const Duration(seconds: 30),
        baseUrl =
            baseUrl ??
            const String.fromEnvironment(
@@ -32,6 +35,7 @@ class DevEnglishApi {
 
   final http.Client _client;
   final Duration _workContextTimeout;
+  final Duration _speechTimeout;
   final String baseUrl;
   void Function()? onUnauthorized;
 
@@ -310,13 +314,17 @@ class DevEnglishApi {
         http.MultipartFile.fromBytes(
           'audio',
           bytes,
+          contentType: http_parser.MediaType.parse(mimeType),
           filename: mimeType.contains('wav')
               ? 'recording.wav'
               : 'recording.webm',
         ),
       );
     request.headers.addAll(_headers());
-    final response = await _client.send(request).then(http.Response.fromStream);
+    final response = await _client
+        .send(request)
+        .then(http.Response.fromStream)
+        .timeout(_speechTimeout);
     return _decode(response);
   }
 

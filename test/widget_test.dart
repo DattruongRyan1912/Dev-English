@@ -5,7 +5,9 @@ import 'package:devenglish/src/screens/speaking_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('renders the focus-first home shell', (tester) async {
+  testWidgets('renders the workspace shell with text assistant', (
+    tester,
+  ) async {
     await tester.pumpWidget(const DevEnglishApp());
     await tester.pump(const Duration(milliseconds: 500));
     if (const String.fromEnvironment(
@@ -16,9 +18,9 @@ void main() {
       expect(find.text('Sign in to DevEnglish'), findsOneWidget);
       return;
     }
-    expect(find.text('Today\'s mission'), findsOneWidget);
-    expect(find.text('Start mission'), findsOneWidget);
-    expect(find.text('Practice'), findsOneWidget);
+    expect(find.text('Today'), findsWidgets);
+    expect(find.text('Ask your assistant'), findsOneWidget);
+    expect(find.text('What should I do next?'), findsOneWidget);
   });
 
   testWidgets('renders speaking controls and manual fallback', (tester) async {

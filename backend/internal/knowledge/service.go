@@ -43,6 +43,16 @@ func (s *Service) CreateChunk(ctx context.Context, scope WorkspaceScope, chunk K
 	return s.repository.CreateChunk(ctx, scope, chunk)
 }
 
+// GetChunk exposes a validated, workspace-scoped read for transport adapters.
+// The repository remains private to the service so callers cannot bypass the
+// workspace boundary.
+func (s *Service) GetChunk(ctx context.Context, scope WorkspaceScope, id string) (KnowledgeChunk, error) {
+	if err := validateScopeAndID(scope, id); err != nil {
+		return KnowledgeChunk{}, err
+	}
+	return s.repository.GetChunk(ctx, scope, id)
+}
+
 func (s *Service) CreateTopic(ctx context.Context, scope WorkspaceScope, topic Topic) error {
 	if err := validateScopeAndEntity(scope, topic.WorkspaceID, topic.Validate); err != nil {
 		return err
@@ -63,6 +73,14 @@ func (s *Service) CreateClaimBundle(ctx context.Context, scope WorkspaceScope, c
 	return s.repository.CreateClaimBundle(ctx, scope, claim, evidence)
 }
 
+// GetClaim exposes a validated, workspace-scoped read for transport adapters.
+func (s *Service) GetClaim(ctx context.Context, scope WorkspaceScope, id string) (KnowledgeClaim, error) {
+	if err := validateScopeAndID(scope, id); err != nil {
+		return KnowledgeClaim{}, err
+	}
+	return s.repository.GetClaim(ctx, scope, id)
+}
+
 type validateFunc func() error
 
 func validateScopeAndEntity(scope WorkspaceScope, workspaceID string, validate validateFunc) error {
@@ -73,4 +91,11 @@ func validateScopeAndEntity(scope WorkspaceScope, workspaceID string, validate v
 		return ErrWorkspaceMismatch
 	}
 	return validate()
+}
+
+func validateScopeAndID(scope WorkspaceScope, id string) error {
+	if err := scope.Validate(); err != nil {
+		return err
+	}
+	return requireIdentifier("id", id)
 }

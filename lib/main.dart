@@ -14,16 +14,19 @@ import 'src/screens/settings_screen.dart';
 import 'src/screens/speaking_screen.dart';
 import 'src/screens/vocabulary_screen.dart';
 import 'src/screens/work_import_screen.dart';
+import 'src/screens/workspace_screen.dart';
 import 'src/theme.dart';
+import 'src/workspace_controller.dart';
 
 void main() {
   runApp(const DevEnglishApp());
 }
 
 class DevEnglishApp extends StatefulWidget {
-  const DevEnglishApp({super.key, this.controller});
+  const DevEnglishApp({super.key, this.controller, this.workspaceController});
 
   final AppController? controller;
+  final WorkspaceController? workspaceController;
 
   @override
   State<DevEnglishApp> createState() => _DevEnglishAppState();
@@ -32,18 +35,23 @@ class DevEnglishApp extends StatefulWidget {
 class _DevEnglishAppState extends State<DevEnglishApp> {
   late final AppController _controller;
   late final bool _ownsController;
+  late final WorkspaceController _workspaceController;
+  late final bool _ownsWorkspaceController;
 
   @override
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
     _controller = widget.controller ?? AppController();
+    _ownsWorkspaceController = widget.workspaceController == null;
+    _workspaceController = widget.workspaceController ?? WorkspaceController();
     _controller.load();
   }
 
   @override
   void dispose() {
     if (_ownsController) _controller.dispose();
+    if (_ownsWorkspaceController) _workspaceController.dispose();
     super.dispose();
   }
 
@@ -52,27 +60,39 @@ class _DevEnglishAppState extends State<DevEnglishApp> {
     title: 'DevEnglish',
     debugShowCheckedModeBanner: false,
     theme: buildAppTheme(),
-    home: _AppShell(controller: _controller),
+    home: _AppShell(
+      controller: _controller,
+      workspaceController: _workspaceController,
+    ),
   );
 }
 
 class _AppShell extends StatefulWidget {
-  const _AppShell({required this.controller});
+  const _AppShell({
+    required this.controller,
+    required this.workspaceController,
+  });
   final AppController controller;
+  final WorkspaceController workspaceController;
 
   @override
   State<_AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends State<_AppShell> {
-  int _index = 0;
+  int _legacyIndex = 0;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
-        if (widget.controller.loading) {
+        // The workspace shell is self-contained in development, so it can
+        // render immediately while the optional legacy data bootstrap runs.
+        // Production/authenticated flows still wait for the bootstrap before
+        // exposing the app shell.
+        if (widget.controller.loading &&
+            widget.controller.requiresAuthentication) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
@@ -114,57 +134,110 @@ class _AppShellState extends State<_AppShell> {
             ),
           );
         }
-        final pages = [
-          HomeScreen(
-            controller: widget.controller,
-            onStartMission: _startMission,
-            onSettings: _openSettings,
-            onDiagnostic: _openDiagnostic,
-            onCopilot: _openCopilot,
-            onVocabulary: _openVocabulary,
-          ),
-          PracticeScreen(
-            controller: widget.controller,
-            onStartMission: _startMission,
-            onWorkImport: _openWorkImport,
-            onSpeaking: _openSpeaking,
-            onRoleplay: _openRoleplay,
-            onCopilot: _openCopilot,
-            onVocabulary: _openVocabulary,
-          ),
-          ReviewScreen(controller: widget.controller),
-          ProgressScreen(controller: widget.controller),
-        ];
-        return Scaffold(
-          body: IndexedStack(index: _index, children: pages),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _index,
-            onDestinationSelected: (value) => setState(() => _index = value),
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Home',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.edit_outlined),
-                selectedIcon: Icon(Icons.edit),
-                label: 'Practice',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.replay_outlined),
-                selectedIcon: Icon(Icons.replay),
-                label: 'Review',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.insights_outlined),
-                selectedIcon: Icon(Icons.insights),
-                label: 'Progress',
-              ),
-            ],
-          ),
+        if (widget.controller.requiresAuthentication &&
+            !widget.controller.usingDemo) {
+          // The workspace preview has no canonical production data adapter
+          // yet. Keep authenticated production users on the existing shell
+          // until that composition is implemented.
+          return _buildLegacyShell();
+        }
+        return WorkspaceShell(
+          controller: widget.workspaceController,
+          learningController: widget.controller,
+          onPractice: _openPractice,
+          onReview: _openReview,
+          onProgress: _openProgress,
+          onDiagnostic: _openDiagnostic,
+          onRoleplay: () => _openRoleplay(null),
+          onCopilot: _openCopilot,
+          onSettings: _openSettings,
         );
       },
+    );
+  }
+
+  Widget _buildLegacyShell() {
+    final pages = [
+      HomeScreen(
+        controller: widget.controller,
+        onStartMission: _startMission,
+        onSettings: _openSettings,
+        onDiagnostic: _openDiagnostic,
+        onCopilot: _openCopilot,
+        onVocabulary: _openVocabulary,
+      ),
+      PracticeScreen(
+        controller: widget.controller,
+        onStartMission: _startMission,
+        onWorkImport: _openWorkImport,
+        onSpeaking: _openSpeaking,
+        onRoleplay: _openRoleplay,
+        onCopilot: _openCopilot,
+        onVocabulary: _openVocabulary,
+      ),
+      ReviewScreen(controller: widget.controller),
+      ProgressScreen(controller: widget.controller),
+    ];
+    return Scaffold(
+      body: IndexedStack(index: _legacyIndex, children: pages),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _legacyIndex,
+        onDestinationSelected: (value) => setState(() => _legacyIndex = value),
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.home_outlined),
+            selectedIcon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.edit_outlined),
+            selectedIcon: Icon(Icons.edit),
+            label: 'Practice',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.replay_outlined),
+            selectedIcon: Icon(Icons.replay),
+            label: 'Review',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights),
+            label: 'Progress',
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openPractice() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PracticeScreen(
+          controller: widget.controller,
+          onStartMission: _startMission,
+          onWorkImport: _openWorkImport,
+          onSpeaking: _openSpeaking,
+          onRoleplay: _openRoleplay,
+          onCopilot: _openCopilot,
+          onVocabulary: _openVocabulary,
+        ),
+      ),
+    );
+  }
+
+  void _openReview() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReviewScreen(controller: widget.controller),
+      ),
+    );
+  }
+
+  void _openProgress() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ProgressScreen(controller: widget.controller),
+      ),
     );
   }
 

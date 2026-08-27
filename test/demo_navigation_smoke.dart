@@ -3,33 +3,24 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
-    'demo navigation smoke covers the four primary destinations',
+    'workspace navigation smoke covers the four primary destinations',
     (tester) async {
       await tester.pumpWidget(const DevEnglishApp());
       await tester.pump(const Duration(seconds: 6));
 
-      expect(find.text("Today's mission"), findsOneWidget);
+      expect(find.text('Today'), findsWidgets);
 
-      await tester.tap(find.text('Practice'));
+      await tester.tap(find.text('Work'));
       await tester.pump(const Duration(milliseconds: 500));
-      expect(
-        find.text('Choose one clear task. Keep the session moving.'),
-        findsOneWidget,
-      );
+      expect(find.text('Open tasks'), findsOneWidget);
 
-      await tester.tap(find.text('Review'));
+      await tester.tap(find.text('Knowledge'));
       await tester.pump(const Duration(milliseconds: 500));
-      expect(
-        find.text('Due items first. Try before you reveal the answer.'),
-        findsOneWidget,
-      );
+      expect(find.text('Connected sources'), findsOneWidget);
 
-      await tester.tap(find.text('Progress'));
+      await tester.tap(find.text('Learning'));
       await tester.pump(const Duration(milliseconds: 500));
-      expect(
-        find.text('Trends that help you choose the next useful practice.'),
-        findsOneWidget,
-      );
+      expect(find.text('Current English layer'), findsOneWidget);
     },
     skip:
         const String.fromEnvironment(
