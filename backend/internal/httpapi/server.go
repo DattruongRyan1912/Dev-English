@@ -52,6 +52,7 @@ func NewServer(service *learning.Service, logger *slog.Logger, managers ...*auth
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
+	mux.HandleFunc("GET /readyz", s.ready)
 	mux.HandleFunc("POST /api/v1/auth/session", s.authSession)
 	mux.HandleFunc("POST /api/v1/auth/login", s.authLogin)
 	mux.HandleFunc("POST /api/v1/auth/logout", s.authLogout)
@@ -95,7 +96,7 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/healthz" ||
+		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" ||
 			(r.URL.Path == "/api/v1/auth/session" && r.Method == http.MethodPost) ||
 			(r.URL.Path == "/api/v1/auth/login" && r.Method == http.MethodPost) ||
 			(r.URL.Path == "/api/v1/auth/logout" && r.Method == http.MethodPost) {
@@ -312,6 +313,14 @@ func (s *Server) authMe(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "service": "devenglish-backend", "time": time.Now().UTC(), "provider": domain.ProviderStatus{Name: s.Service.AI.Name(), Mode: providerMode(s.Service.AI), Configured: s.Service.AI.Configured()}})
+}
+
+func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
+	if err := s.Service.Store.Ready(r.Context()); err != nil {
+		writeError(w, http.StatusServiceUnavailable, errors.New("database is not ready"))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ready", "service": "devenglish-backend", "time": time.Now().UTC()})
 }
 
 func providerMode(provider ai.Provider) string {

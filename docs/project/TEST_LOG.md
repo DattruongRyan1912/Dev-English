@@ -204,3 +204,88 @@ Remaining:
 
 - Real browser microphone permission/capture and playback evidence.
 - Real HTTPS/domain/certificate deployment and production Postgres/auth/secret/backup/readiness verification.
+
+## 2026-08-23 — RC1 P1/P2 Chrome and PostgreSQL verification
+
+Environment:
+
+- Docker backend and PostgreSQL/pgvector running locally.
+- Flutter release web rebuilt and served at `http://localhost:8093`.
+- Real Chrome tab with microphone permission available; no secrets were printed or committed.
+
+Verified:
+
+- Speaking browser E2E: `Ready` → `Recording` → `Success — transcript ready` → persisted `SpeakingSession` → `Success — pronunciation assessed` → `Playing feedback` → `Success — feedback played`. The persisted session was `evaluated`, contained the transcript and had pronunciation assessment data.
+- Diagnostic UI/API/PostgreSQL: 12-question flow returned A1 and `22.5`; `learning_state` and `diagnostic_results` rows were present.
+- Writing UI/API/PostgreSQL: the browser displayed `89 / 100` feedback. A deliberately malformed answer then produced three structured corrections, persisted three `mistakes`, and updated the user's skill profile.
+- Work Context: the first browser attempt exposed a real 30-second client timeout while the provider request took about 34 seconds. The Flutter endpoint now uses a 90-second timeout; the browser then rendered `Suggested mission` successfully. PostgreSQL contained work-context, mission and vocabulary rows.
+- GitHub UI import: public `https://github.com/octocat/Spoon-Knife` rendered a suggested mission with source URL and backend domain; the import was persisted in PostgreSQL.
+- Review UI/API/PostgreSQL: `observed behavior` was revealed and marked `Got it`; `vocabulary_reviews` recorded success `true`, score `90`, mastery advanced to `0.31` and `next_review` moved forward.
+- Roleplay UI/API/PostgreSQL: a real Chrome turn rendered the AI follow-up question; the conversation and roleplay usage rows were persisted.
+- Copilot UI/API/PostgreSQL: Simple, Natural and Professional outputs rendered; Copilot usage was persisted.
+
+Checks:
+
+- `flutter test` — passed (`5` tests, including API client and widget smoke tests).
+- `flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://localhost:8080` — passed.
+- `flutter analyze` — passed.
+- `go test -race ./...` and `go vet ./...` — passed.
+
+Remaining:
+
+- Real HTTPS/domain/certificate deployment and production Postgres/auth/secret/backup/readiness verification.
+- Draft PR #1 and protected `main` are in place; merge still requires one independent approval.
+
+## 2026-08-23 — Production packaging and local production-mode smoke
+
+Implemented:
+
+- Added `GET /readyz`, backed by `Repository.Ready`; PostgreSQL readiness uses `Pool.Ping` and the memory store remains testable.
+- Added CA certificates and `wget` to the backend runtime image for outbound TLS and container health checks.
+- Added `Dockerfile.web`, `infra/docker-compose.production.yml`, `infra/Caddyfile.production`, `infra/production.env.example` and `docs/project/PRODUCTION_RUNBOOK.md`.
+
+Checks:
+
+- `go test ./...`, `go test -race ./...` and `go vet ./...` — passed.
+- `docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet` — passed.
+- Backend production image build — passed.
+- Flutter/Caddy production image build with `API_BASE_URL=https://english.example.com` — passed.
+- Caddy production configuration validation — passed.
+- Local `DEVENGLISH_ENV=production` container smoke — `/healthz` 200, `/readyz` 200, login 200, authenticated `/auth/me` 200, logout 204 and configured HTTPS-origin CORS 200.
+
+Boundary:
+
+- This is local production-mode evidence only. The real domain, DNS, certificate, production host/database, off-host backup and external logging still require operator-provided infrastructure.
+
+## 2026-08-23 — Disposable PostgreSQL repository regression
+
+Implemented:
+
+- Added opt-in `TestPostgresRepositoryIntegration`, enabled with `DEVENGLISH_TEST_DATABASE_URL` so the default unit suite remains database-free.
+- Added a GitHub Actions `postgres` job using disposable `pgvector/pg16`, applying all versioned migrations before the test.
+
+Verified locally against the running PostgreSQL/pgvector container:
+
+- `DEVENGLISH_TEST_DATABASE_URL=... go test ./backend/internal/store -run '^TestPostgresRepositoryIntegration$' -count=1` — passed.
+- The test verified per-user mission isolation, persisted mission completion, persisted mistake extraction, learning-state/skill update and cleanup of disposable users.
+- `go test ./...`, `go test -race ./...`, `go vet ./...`, `git diff --check` and shell syntax checks — passed.
+
+## 2026-08-23 — PR #1 review follow-up: backend-aware Chrome smoke and migration runner
+
+Implemented:
+
+- Added an injectable `AppController` to the Flutter root so the browser smoke can inspect the same state that the rendered screens use without changing production ownership or disposal behavior.
+- Changed the Chrome smoke from demo-only navigation to a backend-backed check. It requires the generated mission from PostgreSQL, verifies Practice/Review/Progress data, and fails when the backend silently falls back to demo data.
+- Used Flutter's integration-test binding only for the explicitly enabled Chrome smoke so real browser HTTP requests are allowed; ordinary `flutter test` remains demo-safe and keeps the smoke skipped.
+- Made the Work Context 90-second timeout an explicit API policy and added a short injected timeout regression test that proves a hanging request is interrupted.
+- Added a disposable Compose PostgreSQL definition and `scripts/db_migrate_test.sh`, which invokes the tracked `scripts/db_migrate.sh`, checks first-run application, second-run idempotency and transactional rollback of a failing migration.
+- Updated CI so the Flutter job starts a disposable backend for the Chrome smoke and the PostgreSQL job exercises the actual migration runner before the repository integration test.
+
+Local checks:
+
+- `flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_BROWSER_SMOKE=true --dart-define=INTEGRATION_TEST_SHOULD_REPORT_RESULTS_TO_NATIVE=false --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://127.0.0.1:18081` — passed against a disposable PostgreSQL-backed Go backend.
+- `COMPOSE_FILE=infra/docker-compose.ci.yml COMPOSE_PROJECT_NAME=devenglish-ci POSTGRES_SERVICE=postgres POSTGRES_USER=devenglish POSTGRES_DB=devenglish ./scripts/db_migrate_test.sh` — passed: all tracked migrations applied, rerun was idempotent and the failing fixture left no table or migration record.
+
+Release boundary:
+
+- RC1 P4 remains `PARTIAL` while PR #1 is awaiting independent review and merge. UsageGuard is intentionally not included in this PR.

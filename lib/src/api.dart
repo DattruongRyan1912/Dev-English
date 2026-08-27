@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' as http_parser;
 
 import 'http_client.dart';
 import 'models.dart';
@@ -15,16 +16,26 @@ class AuthRequiredException implements Exception {
 }
 
 class DevEnglishApi {
-  DevEnglishApi({http.Client? client, String? baseUrl})
-    : _client = client ?? createHttpClient(),
-      baseUrl =
-          baseUrl ??
-          const String.fromEnvironment(
-            'API_BASE_URL',
-            defaultValue: 'http://localhost:8080',
-          );
+  static const defaultWorkContextTimeout = Duration(seconds: 90);
+
+  DevEnglishApi({
+    http.Client? client,
+    String? baseUrl,
+    Duration? workContextTimeout,
+    Duration? speechTimeout,
+  }) : _client = client ?? createHttpClient(),
+       _workContextTimeout = workContextTimeout ?? defaultWorkContextTimeout,
+       _speechTimeout = speechTimeout ?? const Duration(seconds: 30),
+       baseUrl =
+           baseUrl ??
+           const String.fromEnvironment(
+             'API_BASE_URL',
+             defaultValue: 'http://localhost:8080',
+           );
 
   final http.Client _client;
+  final Duration _workContextTimeout;
+  final Duration _speechTimeout;
   final String baseUrl;
   void Function()? onUnauthorized;
 
@@ -237,7 +248,7 @@ class DevEnglishApi {
       'sourceType': sourceType,
       'title': title,
       'content': content,
-    }),
+    }, timeout: _workContextTimeout),
   );
 
   Future<WorkImportResult> importGitHub(String url) async =>
@@ -303,13 +314,17 @@ class DevEnglishApi {
         http.MultipartFile.fromBytes(
           'audio',
           bytes,
+          contentType: http_parser.MediaType.parse(mimeType),
           filename: mimeType.contains('wav')
               ? 'recording.wav'
               : 'recording.webm',
         ),
       );
     request.headers.addAll(_headers());
-    final response = await _client.send(request).then(http.Response.fromStream);
+    final response = await _client
+        .send(request)
+        .then(http.Response.fromStream)
+        .timeout(_speechTimeout);
     return _decode(response);
   }
 

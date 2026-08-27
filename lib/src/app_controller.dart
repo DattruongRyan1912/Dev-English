@@ -377,16 +377,64 @@ class AppController extends ChangeNotifier {
         _error = 'Không thể gửi lượt roleplay production lúc này.';
         return;
       }
-      final reply = answer.toLowerCase().contains('impact')
+      final lowerAnswer = answer.toLowerCase();
+      final normalizedAnswer = lowerAnswer
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      final asksForGuidance =
+          RegExp(
+            r'^(help|help me|need help|i need help|'
+            r'can you help me( .*)?|could you help me( .*)?|'
+            r'please help me( .*)?|i need guidance( .*)?|'
+            r'can you guide me( .*)?|please guide me( .*)?|'
+            r'i don'
+            't know how to answer( .*)?|'
+            r'i dont know how to answer( .*)?)\??$',
+          ).hasMatch(normalizedAnswer) ||
+          const [
+            'chưa biết cách trả lời',
+            'chua biet cach tra loi',
+            'không biết cách trả lời',
+            'khong biet cach tra loi',
+            'hướng dẫn tôi',
+            'huong dan toi',
+            'hướng dẫn mình',
+            'huong dan minh',
+            'giúp tôi trả lời',
+            'giup toi tra loi',
+            'giúp mình trả lời',
+            'giup minh tra loi',
+            'giúp tôi với',
+            'giup toi voi',
+            'giúp mình với',
+            'giup minh voi',
+          ].any(normalizedAnswer.contains);
+      final reply = asksForGuidance
+          ? 'Không sao. Let’s build the answer step by step. Start with: '
+                '"The issue happens when ____. It affects ____. My next step is to ____."'
+          : lowerAnswer.contains('impact')
           ? 'Good. How will you validate the fix and communicate the result?'
           : 'What evidence supports that explanation, and what is the user impact?';
       final evaluation = EvaluationResult(
-        score: answer.trim().split(RegExp(r'\s+')).length >= 12 ? 72 : 58,
-        summary: 'The explanation is understandable and work-focused.',
-        good: const ['You responded to the technical context.'],
-        mainIssue: 'Connect evidence, impact and next step more explicitly.',
-        nextAction: 'Answer once more with evidence, impact and next step.',
+        score: asksForGuidance
+            ? 0
+            : answer.trim().split(RegExp(r'\s+')).length >= 12
+            ? 72
+            : 58,
+        summary: asksForGuidance
+            ? 'Guidance requested; this turn was not scored.'
+            : 'The explanation is understandable and work-focused.',
+        good: asksForGuidance
+            ? const ['You asked for help clearly.']
+            : const ['You responded to the technical context.'],
+        mainIssue: asksForGuidance
+            ? 'Use the starter sentence and replace each blank with one verified detail.'
+            : 'Connect evidence, impact and next step more explicitly.',
+        nextAction: asksForGuidance
+            ? 'Use the starter sentence: write one short sentence about the evidence first, then send it.'
+            : 'Answer once more with evidence, impact and next step.',
         corrections: const [],
+        scored: !asksForGuidance,
       );
       _conversation = Conversation(
         id: conversation.id,

@@ -296,3 +296,150 @@ class FocusHeader extends StatelessWidget {
     );
   }
 }
+
+class HoldToTalkButton extends StatelessWidget {
+  const HoldToTalkButton({
+    super.key,
+    required this.enabled,
+    required this.recording,
+    required this.onPressStart,
+    required this.onPressEnd,
+    required this.onPressCancel,
+  });
+
+  final bool enabled;
+  final bool recording;
+  final VoidCallback onPressStart;
+  final VoidCallback onPressEnd;
+  final VoidCallback onPressCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final background = recording ? AppColors.warning : AppColors.accent;
+    return Semantics(
+      button: true,
+      label: recording ? 'Release to transcribe' : 'Hold to talk',
+      hint: 'Press and hold while speaking, then release to transcribe.',
+      child: GestureDetector(
+        key: const ValueKey('hold-to-talk'),
+        behavior: HitTestBehavior.opaque,
+        onTapDown: enabled ? (_) => onPressStart() : null,
+        onTapUp: enabled ? (_) => onPressEnd() : null,
+        onTapCancel: enabled ? onPressCancel : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.md,
+          ),
+          decoration: BoxDecoration(
+            color: enabled ? background : AppColors.border,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                recording ? Icons.stop_circle_outlined : Icons.mic_none,
+                color: enabled ? Colors.white : AppColors.textSecondary,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                recording ? 'Release to transcribe' : 'Hold to talk',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: enabled ? Colors.white : AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class LearningSupportCard extends StatelessWidget {
+  const LearningSupportCard({
+    super.key,
+    required this.explanation,
+    required this.starter,
+    required this.followUp,
+    this.title = 'Need a little help?',
+    this.onSpeak,
+  });
+
+  final String title;
+  final String explanation;
+  final String starter;
+  final String followUp;
+  final ValueChanged<String>? onSpeak;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: AppColors.accentSoft,
+      child: ExpansionTile(
+        key: const ValueKey('learning-overlay'),
+        leading: const Icon(Icons.lightbulb_outline, color: AppColors.accent),
+        title: Text(title),
+        subtitle: const Text(
+          'Short Vietnamese guidance and one English starter. Open only when needed.',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(
+          AppSpacing.xl,
+          0,
+          AppSpacing.xl,
+          AppSpacing.lg,
+        ),
+        children: [
+          _SupportBlock(title: 'Giải thích ngắn', body: explanation),
+          const SizedBox(height: AppSpacing.md),
+          _SupportBlock(
+            title: 'English starter',
+            body: starter,
+            action: onSpeak == null
+                ? null
+                : IconButton(
+                    onPressed: () => onSpeak!(starter),
+                    tooltip: 'Listen to English starter',
+                    icon: const Icon(Icons.volume_up_outlined),
+                  ),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _SupportBlock(title: 'Try this next', body: followUp),
+        ],
+      ),
+    );
+  }
+}
+
+class _SupportBlock extends StatelessWidget {
+  const _SupportBlock({required this.title, required this.body, this.action});
+
+  final String title;
+  final String body;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: AppSpacing.xs),
+              Text(body, style: Theme.of(context).textTheme.bodyMedium),
+            ],
+          ),
+        ),
+        action ?? const SizedBox.shrink(),
+      ],
+    );
+  }
+}

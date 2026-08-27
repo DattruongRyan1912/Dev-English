@@ -22,14 +22,285 @@ jobs:
 
   flutter:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: devenglish
+          POSTGRES_USER: devenglish
+          POSTGRES_PASSWORD: devenglish-ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U devenglish -d devenglish"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.8'
           channel: stable
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client
+      - name: Prepare disposable backend database
+        env:
+          PGPASSWORD: devenglish-ci
+        run: |
+          for migration in infra/migrations/*.sql; do
+            psql --host=127.0.0.1 --port=5432 --username=devenglish --dbname=devenglish --set=ON_ERROR_STOP=1 --file="$migration"
+          done
+      - name: Start backend for Chrome smoke
+        env:
+          DATABASE_URL: postgres://devenglish:devenglish-ci@127.0.0.1:5432/devenglish?sslmode=disable
+          DEVENGLISH_ENV: development
+          PORT: 8080
+        run: |
+          nohup go run ./backend/cmd/server >/tmp/devenglish-backend.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8080/healthz >/dev/null; then
+              curl --fail --silent http://127.0.0.1:8080/readyz >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          sed -n '1,240p' /tmp/devenglish-backend.log
+          exit 1
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - run: flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_BROWSER_SMOKE=true --dart-define=INTEGRATION_TEST_SHOULD_REPORT_RESULTS_TO_NATIVE=false --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://127.0.0.1:8080
       - run: flutter test --dart-define=DEVENGLISH_ENV=production
       - run: flutter build web --release
+      - name: Verify production web artifact security
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)" || {
+            printf '%s\n' 'CI checkout is not clean before the production artifact gate.' >&2
+            exit 1
+          }
+          bash -n scripts/production_web_artifact_test.sh
+          ./scripts/production_web_artifact_test.sh
+          test -z "$(git status --porcelain=v1)" || {
+            printf '%s\n' 'Production artifact gate changed the CI checkout.' >&2
+            exit 1
+          }
+
+  production:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet
+      - run: docker build --file Dockerfile --tag devenglish-backend:ci .
+      - run: docker build --file Dockerfile.web --build-arg API_BASE_URL=https://english.example.com --tag devenglish-web:ci .
+      - run: docker run --rm -e DEVENGLISH_DOMAIN=english.example.com -e DEVENGLISH_TLS_EMAIL=ops@example.com devenglish-web:ci caddy validate --config /etc/caddy/Caddyfile
+
+  postgres:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Start disposable PostgreSQL
+        run: docker compose -p devenglish-ci -f infra/docker-compose.ci.yml up -d postgres
+      - name: Wait for PostgreSQL
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker compose -p devenglish-ci -f infra/docker-compose.ci.yml exec -T postgres pg_isready -U devenglish -d devenglish; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose -p devenglish-ci -f infra/docker-compose.ci.yml logs postgres
+          exit 1
+      - name: Exercise migration runner
+        env:
+          COMPOSE_FILE: infra/docker-compose.ci.yml
+          COMPOSE_PROJECT_NAME: devenglish-ci
+          POSTGRES_SERVICE: postgres
+          POSTGRES_USER: devenglish
+          POSTGRES_DB: devenglish
+        run: ./scripts/db_migrate_test.sh
+      - name: Run PostgreSQL integration and invariant coverage gate
+        env:
+          DEVENGLISH_TEST_DATABASE_URL: postgres://devenglish:devenglish-ci@127.0.0.1:5432/devenglish?sslmode=disable
+        run: |
+          set -euo pipefail
+          go test -mod=readonly -count=1 -race -cover -coverprofile=/tmp/devenglish-postgres-coverage.out -v \
+            ./backend/internal/store \
+            ./backend/internal/knowledge \
+            ./backend/internal/work \
+            ./backend/internal/connectors \
+            ./backend/internal/mcp \
+            ./backend/internal/assistant | tee /tmp/devenglish-postgres-tests.log
+          awk '
+            BEGIN {
+              required["knowledge"] = 1
+              required["work"] = 1
+              required["connectors"] = 1
+              required["mcp"] = 1
+              status = 0
+            }
+            $1 == "ok" && index($2, "/backend/internal/") {
+              packageParts = split($2, packagePath, "/")
+              package = packagePath[packageParts]
+              if (!(package in required)) next
+              if ($4 != "coverage:") {
+                print "Missing coverage value for " package > "/dev/stderr"
+                status = 2
+                next
+              }
+              coverage = $5
+              gsub("%", "", coverage)
+              seen[package] = 1
+              if ((coverage + 0) < 90) {
+                print package " coverage is below 90%: " coverage "%" > "/dev/stderr"
+                status = 1
+              }
+            }
+            END {
+              for (package in required) {
+                if (!(package in seen)) {
+                  print "No coverage result for " package > "/dev/stderr"
+                  status = 2
+                }
+              }
+              exit status
+            }
+          ' /tmp/devenglish-postgres-tests.log
+      - name: Stop disposable PostgreSQL
+        if: always()
+        run: docker compose -p devenglish-ci -f infra/docker-compose.ci.yml down -v
+
+  legacy-upgrade:
+    runs-on: ubuntu-latest
+    env:
+      DEVENGLISH_CI_PORT: '55432'
+      POSITIVE_PROJECT: devenglish-legacy-upgrade-${{ github.run_id }}-${{ github.run_attempt }}-positive
+      NEGATIVE_PROJECT: devenglish-legacy-upgrade-${{ github.run_id }}-${{ github.run_attempt }}-negative
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate legacy upgrade harness before database startup
+        run: bash -n scripts/db_legacy_upgrade_test.sh scripts/db_migrate.sh
+
+      - name: Start positive disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml up -d postgres
+          for attempt in $(seq 1 60); do
+            if docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml exec -T postgres pg_isready -U devenglish -d devenglish; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml logs postgres
+          exit 1
+
+      - name: Run positive legacy upgrade harness
+        env:
+          DEVENGLISH_LEGACY_UPGRADE_DISPOSABLE: '1'
+          COMPOSE_FILE: infra/docker-compose.ci.yml
+          COMPOSE_PROJECT_NAME: ${{ env.POSITIVE_PROJECT }}
+          POSTGRES_SERVICE: postgres
+          POSTGRES_USER: devenglish
+          POSTGRES_DB: devenglish
+        run: ./scripts/db_legacy_upgrade_test.sh
+
+      - name: Stop positive project before negative control
+        if: always()
+        run: docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans
+
+      - name: Start negative disposable PostgreSQL
+        run: |
+          set -euo pipefail
+          docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml up -d postgres
+          for attempt in $(seq 1 60); do
+            if docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml exec -T postgres pg_isready -U devenglish -d devenglish; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml logs postgres
+          exit 1
+
+      - name: Pre-migrate negative-control database
+        env:
+          COMPOSE_FILE: infra/docker-compose.ci.yml
+          COMPOSE_PROJECT_NAME: ${{ env.NEGATIVE_PROJECT }}
+          ENV_FILE: /tmp/devenglish-legacy-upgrade-ci.env-not-present
+          POSTGRES_SERVICE: postgres
+          POSTGRES_USER: devenglish
+          POSTGRES_DB: devenglish
+        run: ./scripts/db_migrate.sh
+
+      - name: Reject pre-migrated database before seed
+        env:
+          DEVENGLISH_LEGACY_UPGRADE_DISPOSABLE: '1'
+          DEVENGLISH_LEGACY_UPGRADE_NEGATIVE_CONTROL: '1'
+          COMPOSE_FILE: infra/docker-compose.ci.yml
+          COMPOSE_PROJECT_NAME: ${{ env.NEGATIVE_PROJECT }}
+          POSTGRES_SERVICE: postgres
+          POSTGRES_USER: devenglish
+          POSTGRES_DB: devenglish
+        run: |
+          set -euo pipefail
+          output_file=/tmp/devenglish-legacy-upgrade-negative.log
+          ./scripts/db_legacy_upgrade_test.sh 2>&1 | tee "$output_file"
+          grep -Fxq -- 'Negative gate passed: pre-migrated disposable database was rejected before seed.' "$output_file"
+          if grep -Fq -- 'Seeding fixed synthetic legacy rows with parameterized SQL.' "$output_file"; then
+            echo 'Negative control unexpectedly reached the seed step.' >&2
+            exit 1
+          fi
+
+      - name: Stop disposable legacy-upgrade projects
+        if: always()
+        run: |
+          set -euo pipefail
+          cleanup_status=0
+          docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans || cleanup_status=1
+          docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans || cleanup_status=1
+          exit "$cleanup_status"
+
+  backup-restore-recovery:
+    runs-on: ubuntu-latest
+    env:
+      DEVENGLISH_CI_PORT: '55433'
+      RECOVERY_PROJECT: devenglish-backup-restore-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate backup restore harness before database startup
+        run: bash -n scripts/db_backup_restore_test.sh scripts/db_backup.sh scripts/db_restore.sh scripts/db_migrate.sh
+
+      - name: Run disposable backup restore recovery
+        timeout-minutes: 20
+        env:
+          DEVENGLISH_BACKUP_RESTORE_DISPOSABLE: '1'
+          COMPOSE_FILE: infra/docker-compose.ci.yml
+          COMPOSE_PROJECT_NAME: ${{ env.RECOVERY_PROJECT }}
+          POSTGRES_SERVICE: postgres
+          POSTGRES_USER: devenglish
+          POSTGRES_DB: devenglish
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain=v1)" || {
+            printf '%s\n' 'CI checkout is not clean before the backup/restore recovery gate.' >&2
+            exit 1
+          }
+          ./scripts/db_backup_restore_test.sh
+          test -z "$(git status --porcelain=v1)" || {
+            printf '%s\n' 'Backup/restore recovery gate changed the CI checkout.' >&2
+            exit 1
+          }
+
+      - name: Clean disposable backup restore project
+        if: always()
+        run: docker compose --project-name "$RECOVERY_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans

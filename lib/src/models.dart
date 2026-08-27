@@ -293,6 +293,7 @@ class EvaluationResult {
     required this.mainIssue,
     required this.nextAction,
     required this.corrections,
+    this.scored = true,
   });
 
   final double score;
@@ -301,6 +302,7 @@ class EvaluationResult {
   final String mainIssue;
   final String nextAction;
   final List<Correction> corrections;
+  final bool scored;
 
   factory EvaluationResult.fromJson(Map<String, dynamic> json) =>
       EvaluationResult(
@@ -312,6 +314,7 @@ class EvaluationResult {
         corrections: _maps(
           json['corrections'],
         ).map(Correction.fromJson).toList(),
+        scored: json['scored'] != false,
       );
 }
 

@@ -31,6 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   http: ^1.5.0
+  http_parser: ^4.1.2
   record: ^6.1.1
   audioplayers: ^6.5.0
 
@@ -40,6 +41,8 @@ dependencies:
 
 dev_dependencies:
   flutter_test:
+    sdk: flutter
+  integration_test:
     sdk: flutter
 
   # The "flutter_lints" package below contains a set of recommended lints to
