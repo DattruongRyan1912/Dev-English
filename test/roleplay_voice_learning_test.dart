@@ -22,6 +22,33 @@ const _scenarioJson = {
   'type': 'incident',
 };
 
+const _isProduction =
+    String.fromEnvironment('DEVENGLISH_ENV', defaultValue: 'development') ==
+    'production';
+
+Response _scenarioListResponse() => Response(
+  jsonEncode({
+    'scenarios': [_scenarioJson],
+  }),
+  200,
+);
+
+Response _conversationResponse() => Response(
+  jsonEncode({
+    'id': 'conversation-1',
+    'roleplayType': 'demo-incident',
+    'context': _scenarioJson['context'],
+    'messages': [
+      {
+        'id': 'opening',
+        'role': 'assistant',
+        'content': 'Walk me through the incident.',
+      },
+    ],
+  }),
+  200,
+);
+
 class _FakeRoleplayRecorder implements RoleplayAudioRecorder {
   _FakeRoleplayRecorder({
     this.permission = true,
@@ -215,6 +242,20 @@ void main() {
         'Tôi chưa biết cách trả lời, bạn hướng dẫn tôi được không?',
       );
 
+      if (_isProduction) {
+        expect(
+          controller.conversation!.messages.last.content,
+          'Walk me through the incident.',
+        );
+        expect(controller.conversation!.messages, hasLength(1));
+        expect(controller.lastRoleplayTurn, isNull);
+        expect(
+          controller.error,
+          'Không thể gửi lượt roleplay production lúc này.',
+        );
+        return;
+      }
+
       expect(
         controller.conversation!.messages.last.content,
         contains('Let’s build the answer step by step'),
@@ -268,6 +309,31 @@ void main() {
       await controller.sendRoleplayTurn(
         'toi chua biet cach tra loi, huong dan toi voi',
       );
+
+      if (_isProduction) {
+        expect(
+          controller.conversation!.messages.last.content,
+          'Walk me through the incident.',
+        );
+        expect(controller.conversation!.messages, hasLength(1));
+        expect(controller.lastRoleplayTurn, isNull);
+        expect(
+          controller.error,
+          'Không thể gửi lượt roleplay production lúc này.',
+        );
+
+        await controller.sendRoleplayTurn(
+          'The helper service returns HTTP 500; the logs help explain the impact.',
+        );
+        expect(controller.conversation!.messages, hasLength(1));
+        expect(controller.lastRoleplayTurn, isNull);
+        expect(
+          controller.error,
+          'Không thể gửi lượt roleplay production lúc này.',
+        );
+        return;
+      }
+
       expect(
         controller.conversation!.messages.last.content,
         contains('Let’s build the answer step by step'),
@@ -290,6 +356,39 @@ void main() {
       );
     },
   );
+
+  test('roleplay data loading is fallback-only outside production', () async {
+    final controller = AppController(
+      api: DevEnglishApi(client: MockClient((_) async => Response('{}', 404))),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.loadRoleplay();
+
+    if (_isProduction) {
+      expect(controller.scenarios, isEmpty);
+      expect(controller.error, 'Không thể tải roleplay scenarios lúc này.');
+
+      await controller.startRoleplay('demo-incident');
+      expect(controller.conversation, isNull);
+      expect(controller.lastRoleplayTurn, isNull);
+      expect(
+        controller.error,
+        'Không thể bắt đầu roleplay production lúc này.',
+      );
+      return;
+    }
+
+    expect(controller.scenarios, isNotEmpty);
+    expect(controller.scenarios.first.id, 'demo-incident');
+    await controller.startRoleplay('demo-incident');
+    expect(controller.conversation, isNotNull);
+    expect(
+      controller.conversation!.messages.last.content,
+      'Walk me through what happened, the user impact and your next step.',
+    );
+    expect(controller.error, 'Không thể bắt đầu roleplay lúc này.');
+  });
 
   testWidgets('voice release transcribes while gesture cancel discards audio', (
     tester,
@@ -404,6 +503,14 @@ void main() {
     final controller = AppController(
       api: DevEnglishApi(
         client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/roleplay/scenarios') {
+            return _scenarioListResponse();
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/roleplay/conversations') {
+            return _conversationResponse();
+          }
           if (request.method == 'POST' &&
               request.url.path == '/api/v1/speaking/transcribe') {
             transcribeRequests++;
@@ -521,6 +628,14 @@ void main() {
     final controller = AppController(
       api: DevEnglishApi(
         client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/roleplay/scenarios') {
+            return _scenarioListResponse();
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/roleplay/conversations') {
+            return _conversationResponse();
+          }
           if (request.method == 'POST' &&
               request.url.path == '/api/v1/speaking/transcribe') {
             transcribeRequests++;
@@ -575,7 +690,19 @@ void main() {
   ) async {
     final recorder = _FakeRoleplayRecorder(permission: false);
     final controller = AppController(
-      api: DevEnglishApi(client: MockClient((_) async => Response('{}', 404))),
+      api: DevEnglishApi(
+        client: MockClient((request) async {
+          if (request.method == 'GET' &&
+              request.url.path == '/api/v1/roleplay/scenarios') {
+            return _scenarioListResponse();
+          }
+          if (request.method == 'POST' &&
+              request.url.path == '/api/v1/roleplay/conversations') {
+            return _conversationResponse();
+          }
+          return Response('{}', 404);
+        }),
+      ),
     );
     addTearDown(controller.dispose);
 
@@ -587,7 +714,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Demo fallback provides the scenario when the test client has no backend.
     await tester.tap(find.text('Explain an incident to a teammate'));
     await tester.pumpAndSettle();
     await tester.startGesture(
