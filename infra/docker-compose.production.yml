@@ -8,7 +8,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
     volumes:
       - devenglish-production-postgres:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -25,9 +24,14 @@ services:
         required: false
     environment:
       DEVENGLISH_ENV: production
+      DEVENGLISH_MODULES: ${DEVENGLISH_MODULES:-all}
       PORT: "8080"
+      EMBEDDING_SIDECAR_URL: http://embedding:8090
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
     depends_on:
       postgres:
+        condition: service_healthy
+      embedding:
         condition: service_healthy
     expose:
       - "8080"
@@ -46,12 +50,39 @@ services:
       retries: 6
       start_period: 15s
 
+  embedding:
+    build:
+      context: ..
+      dockerfile: infra/embedding/Dockerfile
+    environment:
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
+    volumes:
+      - devenglish-production-embedding-models:/models
+    expose:
+      - "8090"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 180s
+
   web:
     build:
       context: ..
       dockerfile: Dockerfile.web
       args:
         API_BASE_URL: ${DEVENGLISH_PUBLIC_ORIGIN:?set DEVENGLISH_PUBLIC_ORIGIN in .env.production}
+        WORKSPACE_SHELL: ${DEVENGLISH_WORKSPACE_SHELL:-new}
     environment:
       DEVENGLISH_DOMAIN: ${DEVENGLISH_DOMAIN:?set DEVENGLISH_DOMAIN in .env.production}
       DEVENGLISH_TLS_EMAIL: ${DEVENGLISH_TLS_EMAIL:?set DEVENGLISH_TLS_EMAIL in .env.production}
@@ -68,5 +99,6 @@ services:
 
 volumes:
   devenglish-production-postgres:
+  devenglish-production-embedding-models:
   devenglish-caddy-data:
   devenglish-caddy-config:

@@ -1,0 +1,479 @@
+{
+  "schema": "devenglish-agent-run@1",
+  "waveId": "WAVE-2",
+  "state": "verified",
+  "reason": "WAVE-2-REVIEW-R10 approved the integrated Wave 2 cones after TASK-005-R4 repair; awaiting human-controlled commit/push/merge/deploy gate",
+  "reviewCycle": "WAVE-2-REVIEW-R10",
+  "repairCycle": "WAVE-2-REPAIR-R4",
+  "reviewInputFrozen": true,
+  "newSpawnAllowed": false,
+  "attentionAgentId": null,
+  "reviewObservationTimeouts": 42,
+  "observationTimeouts": 8,
+  "lastObservedStatus": "completed",
+  "lastObservedAt": "2026-08-26T11:29:00Z",
+  "lastObservedEvidence": {
+    "source": "codex_app__wait_threads plus codex_app__read_thread",
+    "threadId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+    "turnId": "01a03dce-7540-71e2-b7fd-1bbea65170df",
+    "threadStatus": "idle",
+    "turnStatus": "completed",
+    "verdict": "approved",
+    "observedAt": "2026-08-26T11:29:00Z"
+  },
+  "recoveryDecision": {
+    "recordedAt": "2026-08-26T08:05:22Z",
+    "decision": "reconcile the failed R3 slot, do not replace or spawn another reviewer, and proceed only with the existing bounded TASK-007A-R1 action",
+    "basis": [
+      "authoritative Codex thread turn is terminal failed with usage_limit",
+      "thread status is idle",
+      "no final R3 verdict was returned",
+      "integration and commit/push/merge/deploy remain unauthorized"
+    ]
+  },
+  "integrationTarget": "/Users/ryantruong/Project/Orther/Dev-English",
+  "integrationBranch": "integration/wave-2",
+  "integrationWorktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-2-integration",
+  "integrationStartedAt": "2026-08-26T09:54:47Z",
+  "maxWorkers": 4,
+  "maxReviewers": 1,
+  "acceptedReviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+  "activeReviewSubmissionId": null,
+  "reviewHistory": [
+    {
+      "cycle": "WAVE-2-REVIEW-R2",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "evidencePath": "docs/project/agent-runs/WAVE-2-REVIEW-R2.md"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R3",
+      "reviewerAgentId": "01a03cc2-76cc-71b3-9480-a88f8823f0c3",
+      "verdict": "errored",
+      "terminalReason": "usage_limit; no final verdict returned",
+      "evidencePath": "codex-thread:01a03cc2-76cc-71b3-9480-a88f8823f0c3"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R4",
+      "taskId": "TASK-007A-R1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d1f-4d16-76c1-b129-fc0a538bc85c"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R5",
+      "taskId": "TASK-003-R1,TASK-004-R1,TASK-005-R1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "TASK-003-R1 and TASK-004-R1 approved; TASK-005-R1 has missing workspace-scoped sync deduplication and post-mutation durable idempotency reservation",
+      "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d2d-e520-7cc3-bd69-17f4d7d5a8dd"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R6",
+      "taskId": "TASK-005-R2",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "No blocking, high, or medium findings; both R5 HIGH repairs verified",
+      "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d59-7698-7113-942c-1a4483f1997e",
+      "submissionId": "01a03d59-7698-7113-942c-1a4483f1997e"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R7",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "blocked",
+      "findingSummary": "Integrated branch lacks migration 003 that creates workspaces; migrations 005/006 cannot form a fresh runnable chain",
+      "evidencePath": "docs/project/agent-runs/WAVE-2-INTEGRATION-R7.md",
+      "submissionId": "01a03d80-e5df-7342-bbae-fc82dc25a9ef"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R8",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "HIGH cross-tenant integrity gaps in Work ownership and GitHub safe-write challenge/receipt scope; governance manifest was stale during review",
+      "evidencePath": "docs/project/agent-runs/WAVE-2-REVIEW-R8.md",
+      "submissionId": "01a03d9f-622e-7a70-b451-dc0d95c62525"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R9",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "TASK-005 durable receipt unique index is narrower than the Go workspace/user/operation/idempotency contract",
+      "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03dba-a036-70b2-9db7-57622a0372b6",
+      "submissionId": "01a03dba-a036-70b2-9db7-57622a0372b6"
+    },
+    {
+      "cycle": "WAVE-2-REVIEW-R10",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "TASK-005-R4 resolved the durable receipt identity mismatch; no blocker, high, or medium finding remains",
+      "evidencePath": "docs/project/agent-runs/WAVE-2-REVIEW-R10.md",
+      "submissionId": "01a03dce-7540-71e2-b7fd-1bbea65170df"
+    }
+  ],
+  "plannedRepairs": [
+    {"taskId": "TASK-003-R1", "repairOf": "TASK-003", "role": "worker", "fileCone": ["backend/internal/knowledge/", "infra/migrations/005_knowledge.sql"]},
+    {"taskId": "TASK-004-R1", "repairOf": "TASK-004", "role": "worker", "fileCone": ["backend/internal/work/", "infra/migrations/006_work.sql"]},
+    {"taskId": "TASK-005-R1", "repairOf": "TASK-005", "role": "worker", "fileCone": ["backend/internal/connectors/"]},
+    {"taskId": "TASK-007A-R1", "repairOf": "TASK-007A", "role": "worker", "fileCone": ["backend/internal/mcp/"]}
+  ],
+  "repairAssignments": [
+    {
+      "taskId": "TASK-003-R1",
+      "repairOf": "TASK-003",
+      "agentId": "01a03ca6-5d5a-7602-9443-e5663485e5dd",
+      "name": "Planck",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/knowledge/", "infra/migrations/005_knowledge.sql"],
+      "terminalReason": "implemented repair and returned final report",
+      "testEvidence": {
+        "gofmt": 0,
+        "raceCoverage": 0,
+        "coveragePercent": 96.3,
+        "vet": 0,
+        "postgresIntegration": "skipped; DEVENGLISH_TEST_DATABASE_URL unset"
+      },
+      "evidencePaths": [
+        "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-TASK-003-knowledge/backend/internal/knowledge/postgres_integration_test.go"
+      ]
+    },
+    {
+      "taskId": "TASK-004-R1",
+      "repairOf": "TASK-004",
+      "agentId": "01a03ca6-6131-71b3-a22f-f98b2d28f36f",
+      "name": "Arendt",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/work/", "infra/migrations/006_work.sql"],
+      "terminalReason": "implemented repair and returned final report",
+      "testEvidence": {
+        "gofmt": 0,
+        "raceCoverage": 0,
+        "coveragePercent": 93.3,
+        "testsPassed": 164,
+        "vet": 0,
+        "sqlRuntime": "unverified; prerequisite migrations 003/004 absent in worker worktree"
+      },
+      "evidencePaths": [
+        "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-TASK-004-work/backend/internal/work/work_test.go",
+        "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-TASK-004-work/infra/migrations/006_work.sql"
+      ]
+    },
+    {
+      "taskId": "TASK-005-R1",
+      "repairOf": "TASK-005",
+      "agentId": "01a03ca6-649b-71d0-ad58-10d2ccfab7f2",
+      "name": "Huygens",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/connectors/"],
+      "terminalReason": "implemented repair and returned final report",
+      "testEvidence": {
+        "gofmt": 0,
+        "raceCoverage": 0,
+        "coveragePercent": 93.7,
+        "vet": 0,
+        "coverProfile": "/tmp/devenglish-connectors-final.cover"
+      },
+      "evidencePaths": [
+        "/Users/ryantruong/Project/Orther/Dev-English.worktrees/TASK-002C-connectors/backend/internal/connectors/safe_write_service_test.go",
+        "/Users/ryantruong/Project/Orther/Dev-English.worktrees/TASK-002C-connectors/backend/internal/connectors/sync_service_test.go"
+      ]
+    },
+    {
+      "taskId": "TASK-007A-R1",
+      "repairOf": "TASK-007A",
+      "agentId": "01a03ca6-67ff-7822-8a75-4a669dc6b0c1",
+      "name": "Cicero",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/mcp/"],
+      "terminalReason": "implemented repair and returned final report",
+      "testEvidence": {
+        "gofmt": 0,
+        "raceCoverage": 0,
+        "coveragePercent": 95.3,
+        "vet": 0,
+        "testsPassed": 11
+      },
+      "evidencePaths": [
+        "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-TASK-007A-mcp/backend/internal/mcp/mcp_test.go"
+      ]
+    }
+  ],
+  "completedHandoff": {
+    "taskId": "TASK-007A-R1",
+    "worktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-TASK-007A-mcp",
+    "baseCommit": "d39019abb93b333654b14e068a1ae0d476b1cae2",
+    "status": "approved_not_integrated",
+    "fileStatus": "only backend/internal/mcp/ is untracked; no files outside the assigned cone",
+    "files": [
+      "backend/internal/mcp/auth.go",
+      "backend/internal/mcp/errors.go",
+      "backend/internal/mcp/mcp_test.go",
+      "backend/internal/mcp/protocol.go",
+      "backend/internal/mcp/registry.go",
+      "backend/internal/mcp/replay.go",
+      "backend/internal/mcp/scope.go"
+    ],
+    "verification": {
+      "gofmt": {"exit": 0},
+      "focusedRaceTest": {"exit": 0, "testsPassed": 11, "coveragePercent": 95.3},
+      "focusedVet": {"exit": 0},
+      "repositoryTest": {"exit": 0, "testsPassed": 58},
+      "repositoryVet": {"exit": 0},
+      "coverProfile": "/tmp/devenglish-mcp-r1.cover"
+    },
+    "recordedAt": "2026-08-26T08:09:17Z",
+    "reviewer": {
+      "cycle": "WAVE-2-REVIEW-R4",
+      "agentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "status": "completed",
+      "startedAt": "2026-08-26T08:11:22Z",
+      "completedAt": "2026-08-26T08:21:09Z",
+      "verdict": "approved",
+      "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d1f-4d16-76c1-b129-fc0a538bc85c"
+    }
+  },
+  "nextHandoff": {
+    "taskId": "WAVE-2-HUMAN-GATE",
+    "status": "awaiting_human_gate",
+    "repairOf": "WAVE-2-REVIEW-R10",
+    "baseCommit": "d39019abb93b333654b14e068a1ae0d476b1cae2",
+    "worktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-2-integration",
+    "branch": "integration/wave-2",
+    "fileCone": [
+      "backend/internal/knowledge/",
+      "infra/migrations/005_knowledge.sql",
+      "backend/internal/work/",
+      "infra/migrations/006_work.sql",
+      "backend/internal/connectors/",
+      "backend/internal/mcp/"
+    ],
+    "authorizedFoundationMigrations": [
+      "infra/migrations/003_platform_foundation.sql",
+      "infra/migrations/004_platform_safety.sql"
+    ],
+    "repairTasks": [
+      {
+        "taskId": "TASK-004-R2",
+        "finding": "Composite workspace-owner integrity for projects, tasks, decisions and work idempotency",
+        "fileCone": ["backend/internal/work/", "infra/migrations/006_work.sql"]
+      },
+      {
+        "taskId": "TASK-005-R3",
+        "finding": "Propagate workspace scope through safe-write API/store and bind challenge/receipt tenant identity",
+        "fileCone": ["backend/internal/connectors/", "infra/migrations/003_platform_foundation.sql"]
+      },
+      {
+        "taskId": "TASK-005-R4",
+        "finding": "Align durable receipt uniqueness with the Go tuple (workspace, user, operation, idempotency key) and prove same-key different-operation behavior",
+        "fileCone": ["backend/internal/connectors/", "infra/migrations/003_platform_foundation.sql"]
+      }
+    ],
+    "acceptanceCriteria": [
+      "Authorize the exact foundation migration target that owns workspaces",
+      "Re-run the complete migration chain against an isolated PostgreSQL database",
+      "Repair the two HIGH findings without changing unrelated canonical WIP",
+      "Re-run the same Sol Ultra review after the repairs",
+      "Keep commit, push, merge and deploy authorization false until the next gate passes"
+    ],
+    "reviewAfterRepair": {
+      "cycle": "WAVE-2-REVIEW-R10",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "reuseExistingReviewer": true,
+      "status": "completed",
+      "verdict": "approved",
+      "evidencePath": "docs/project/agent-runs/WAVE-2-REVIEW-R10.md"
+    }
+  },
+  "humanAuthorization": {
+    "implementation": true,
+    "integration": true,
+    "foundationMigrations": true,
+    "commit": false,
+    "push": false,
+    "merge": false,
+    "deploy": false
+  },
+  "agents": [
+    {
+      "taskId": "TASK-003",
+      "agentId": "01a03c66-9994-77f0-83fe-3e79b32576b6",
+      "name": "Ramanujan",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/knowledge/", "infra/migrations/005_knowledge.sql"]
+    },
+    {
+      "taskId": "TASK-004",
+      "agentId": "01a03c66-a0f2-71d0-84fb-1ca940e5f5dd",
+      "name": "Meitner",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/work/", "infra/migrations/006_work.sql"]
+    },
+    {
+      "taskId": "TASK-005",
+      "agentId": "01a03c66-a903-7d02-969b-7e6f9a59cff4",
+      "name": "McClintock",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/connectors/"]
+    },
+    {
+      "taskId": "TASK-007A",
+      "agentId": "01a03c66-b1af-7583-942b-e6aaeaafe15e",
+      "name": "Banach",
+      "role": "worker",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "fileCone": ["backend/internal/mcp/"]
+    },
+    {
+      "taskId": "WAVE-2-REVIEW-R10",
+      "agentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "name": "Huygens",
+      "role": "reviewer",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "terminalReason": "R10 independent review approved the integrated Wave 2 cones",
+      "submissionId": "01a03dce-7540-71e2-b7fd-1bbea65170df",
+      "completedAt": "2026-08-26T11:29:00Z",
+      "evidencePaths": [
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d59-7698-7113-942c-1a4483f1997e",
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d80-e5df-7342-bbae-fc82dc25a9ef",
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d9f-622e-7a70-b451-dc0d95c62525",
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03dba-a036-70b2-9db7-57622a0372b6",
+        "docs/project/agent-runs/WAVE-2-REVIEW-R10.md"
+      ],
+      "priorCycles": [
+        {
+          "cycle": "WAVE-2-REVIEW-R2",
+          "status": "completed",
+          "verdict": "changes_requested",
+          "evidencePath": "docs/project/agent-runs/WAVE-2-REVIEW-R2.md"
+        },
+        {
+          "cycle": "WAVE-2-REVIEW-R4",
+          "status": "completed",
+          "verdict": "approved",
+          "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d1f-4d16-76c1-b129-fc0a538bc85c"
+        },
+        {
+          "cycle": "WAVE-2-REVIEW-R5",
+          "status": "completed",
+          "verdict": "changes_requested",
+          "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d2d-e520-7cc3-bd69-17f4d7d5a8dd"
+        },
+        {
+          "cycle": "WAVE-2-REVIEW-R6",
+          "status": "completed",
+          "verdict": "approved",
+          "evidencePath": "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03d59-7698-7113-942c-1a4483f1997e"
+        },
+        {
+          "cycle": "WAVE-2-REVIEW-R8",
+          "status": "completed",
+          "verdict": "changes_requested",
+          "evidencePath": "docs/project/agent-runs/WAVE-2-REVIEW-R8.md"
+        }
+      ],
+      "fileCone": [
+        "backend/internal/knowledge/",
+        "infra/migrations/005_knowledge.sql",
+        "backend/internal/work/",
+        "infra/migrations/006_work.sql",
+        "backend/internal/connectors/",
+        "backend/internal/mcp/"
+      ]
+    },
+    {
+      "taskId": "WAVE-2-REVIEW-R3",
+      "agentId": "01a03cc2-76cc-71b3-9480-a88f8823f0c3",
+      "name": "Darwin",
+      "role": "reviewer",
+      "parentAgentId": null,
+      "status": "errored",
+      "canSpawn": false,
+      "terminalReason": "Codex thread turn failed with usage limit; thread was idle and no final review verdict was returned",
+      "evidencePaths": [
+        "codex-thread:01a03cc2-76cc-71b3-9480-a88f8823f0c3"
+      ],
+      "fileCone": [
+        "backend/internal/knowledge/",
+        "backend/internal/work/",
+        "backend/internal/connectors/",
+        "backend/internal/mcp/",
+        "infra/migrations/005_knowledge.sql",
+        "infra/migrations/006_work.sql"
+      ]
+    },
+    {
+      "taskId": "WAVE-2-REVIEW",
+      "agentId": "01a03c75-a4b5-7a92-9fa5-1e4c16fb6803",
+      "name": "Goodall",
+      "role": "reviewer",
+      "parentAgentId": null,
+      "status": "shutdown",
+      "canSpawn": false,
+      "terminalReason": "controller incorrectly replaced reviewer after wait timeouts"
+    },
+    {
+      "taskId": "WAVE-2-REVIEW",
+      "agentId": "01a03c7c-2492-7971-bf04-5dbd439fb082",
+      "name": "Poincare",
+      "role": "reviewer",
+      "parentAgentId": null,
+      "status": "shutdown",
+      "canSpawn": false,
+      "terminalReason": "operator stopped duplicate review chain"
+    },
+    {
+      "taskId": "WAVE-2-REVIEW",
+      "agentId": "01a03c7d-2eb9-7ee3-9220-81c2550784c9",
+      "name": "Jason",
+      "role": "reviewer",
+      "parentAgentId": "01a03c7c-2492-7971-bf04-5dbd439fb082",
+      "status": "shutdown",
+      "canSpawn": false,
+      "terminalReason": "descendant duplicated its parent review assignment"
+    }
+  ],
+  "incidents": [
+    {
+      "id": "ORCH-INC-20260826-001",
+      "summary": "Goodall was interrupted after observation timeouts; Poincare replaced it and spawned Jason with the same review assignment.",
+      "impact": "duplicate review work and unnecessary model usage; no review verdict accepted and no Wave 2 output integrated",
+      "recovery": "all reviewers stopped; run paused; protocol and verifier added before resumption"
+    },
+    {
+      "id": "ORCH-INC-20260826-002",
+      "summary": "R3 had no final verdict: the authoritative Codex thread reported an idle thread with a failed usage-limit turn, while the multi-agent wait layer continued to time out.",
+      "impact": "review output was unavailable and lifecycle/content signals conflicted; no replacement reviewer or integration was authorized",
+      "recovery": "read the authoritative thread, closed only the failed R3 reviewer, recorded the terminal evidence, retained newSpawnAllowed=false, and kept the run gated before the next bounded TASK-007A-R1 action"
+    },
+    {
+      "id": "ORCH-INC-20260826-003",
+      "summary": "The controller was about to end its turn while the R4 reviewer was still active after lifecycle-only waits timed out.",
+      "impact": "the work could have appeared stuck even though the reviewer was still producing evidence; no code or reviewer state was lost",
+      "recovery": "waited on the authoritative Codex thread with wait_threads, read the completed verdict, recorded it in the manifest, and added ORCH-012 requiring wait or heartbeat wake-up while an agent is active"
+    }
+  ]
+}

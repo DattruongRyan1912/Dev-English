@@ -1,0 +1,11 @@
+{
+  "schema": "cyberos.verdict@1",
+  "actor": "ryantruong",
+  "timestamp": "2026-08-25T19:16:14Z",
+  "task_id": "TASK-CYB-001",
+  "from": "reviewing",
+  "to": "ready_to_test",
+  "evidence_path": "docs/tasks/cyberos/TASK-CYB-001-cyberos-only-workflow/review.md",
+  "evidence_sha256": "b57638e079e7ea67d6987b4270e9f6819280b1b58bc54876db9081236daf6a25",
+  "artifact_sha256": "6188fddea5b70cf95440bdc9186f745aea6b37b7777311fcd7bec5406169184b"
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "metric": "go-statement-coverage",
+  "baselineRef": "104304f12f411dd534aa4b385e964b3b8c11ae43",
+  "measuredAt": "2026-08-29",
+  "coveredStatements": 4269,
+  "totalStatements": 6393,
+  "coveragePercent": 66.78,
+  "profileSha256": "7d05dd0fa4fd75dbcc0e8e4523bc289d836dbd93f47890587277cc79b8dc26c3"
+}

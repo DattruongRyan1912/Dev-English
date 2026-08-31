@@ -301,6 +301,17 @@ type ClaimEvidence struct {
 	CreatedAt        time.Time
 }
 
+// SourceDetail is the bounded read model used by the workspace UI and
+// adapters that need to explain where a source came from. Revisions and
+// chunks remain immutable; this type only groups them for inspection.
+type SourceDetail struct {
+	Source    KnowledgeSource
+	Items     []SourceItem
+	Revisions []SourceRevision
+	Chunks    []KnowledgeChunk
+	Evidence  []ClaimEvidence
+}
+
 func (e ClaimEvidence) Validate() error {
 	if err := requireIdentifier("id", e.ID); err != nil {
 		return err

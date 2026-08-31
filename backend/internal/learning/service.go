@@ -10,6 +10,7 @@ import (
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/ai"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/store"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/usageguard"
 )
 
 type Service struct {
@@ -21,6 +22,7 @@ type Service struct {
 	Pronunciation   ai.PronunciationProvider
 	GitHub          GitHubImporter
 	Now             func() time.Time
+	BudgetGuard     *usageguard.Guard
 }
 
 type GitHubImporter interface {
@@ -34,8 +36,53 @@ type SpeechDependencies struct {
 	GitHub        GitHubImporter
 }
 
+func (s *Service) generateMissionWithUsage(ctx context.Context, request ai.MissionRequest) (domain.Mission, ai.JSONUsage, error) {
+	if provider, ok := s.AI.(ai.UsageAwareMissionProvider); ok {
+		return provider.GenerateMissionWithUsage(ctx, request)
+	}
+	result, err := s.AI.GenerateMission(ctx, request)
+	return result, ai.JSONUsage{}, err
+}
+
+func (s *Service) evaluateWritingWithUsage(ctx context.Context, request ai.WritingRequest) (domain.Evaluation, ai.JSONUsage, error) {
+	if provider, ok := s.AI.(ai.UsageAwareWritingProvider); ok {
+		return provider.EvaluateWritingWithUsage(ctx, request)
+	}
+	result, err := s.AI.EvaluateWriting(ctx, request)
+	return result, ai.JSONUsage{}, err
+}
+
+func (s *Service) generateRoleplayWithUsage(ctx context.Context, request ai.RoleplayRequest) (ai.RoleplayResult, ai.JSONUsage, error) {
+	if provider, ok := s.AI.(ai.UsageAwareRoleplayProvider); ok {
+		return provider.GenerateRoleplayWithUsage(ctx, request)
+	}
+	provider, ok := s.AI.(ai.RoleplayProvider)
+	if !ok {
+		return ai.RoleplayResult{}, ai.JSONUsage{}, errors.New("roleplay provider is unavailable")
+	}
+	result, err := provider.GenerateRoleplay(ctx, request)
+	return result, ai.JSONUsage{}, err
+}
+
+func (s *Service) generateCopilotWithUsage(ctx context.Context, request ai.CopilotRequest) (domain.CopilotResult, ai.JSONUsage, error) {
+	if provider, ok := s.AI.(ai.UsageAwareCopilotProvider); ok {
+		return provider.GenerateCopilotWithUsage(ctx, request)
+	}
+	provider, ok := s.AI.(ai.CopilotProvider)
+	if !ok {
+		return domain.CopilotResult{}, ai.JSONUsage{}, errors.New("copilot provider is unavailable")
+	}
+	result, err := provider.GenerateCopilot(ctx, request)
+	return result, ai.JSONUsage{}, err
+}
+
 func NewService(repository store.Repository, provider ai.Provider, speech ...SpeechDependencies) *Service {
-	service := &Service{Store: repository, AI: provider, Now: func() time.Time { return time.Now().UTC() }}
+	service := &Service{
+		Store:       repository,
+		AI:          provider,
+		Now:         func() time.Time { return time.Now().UTC() },
+		BudgetGuard: usageguard.New(),
+	}
 	if len(speech) > 0 {
 		service.STT = speech[0].STT
 		service.TTS = speech[0].TTS
@@ -80,10 +127,16 @@ func (s *Service) CreateDailyMission(ctx context.Context, workContext string) (d
 	if strings.TrimSpace(workContext) == "" {
 		workContext = s.recentWorkContext(ctx)
 	}
-	if err := s.ensureBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-flash", 700, 350)); err != nil {
+	reservation, err := s.reserveBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-flash", 700, 350), "mission")
+	if err != nil {
 		return domain.Mission{}, err
 	}
-	mission, err := s.AI.GenerateMission(ctx, ai.MissionRequest{LearningState: state, WorkContext: workContext})
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
+	mission, usage, err := s.generateMissionWithUsage(ctx, ai.MissionRequest{LearningState: state, WorkContext: workContext})
 	if err != nil {
 		return domain.Mission{}, err
 	}
@@ -93,7 +146,14 @@ func (s *Service) CreateDailyMission(ctx context.Context, workContext string) (d
 	if err := s.Store.SaveMission(ctx, mission); err != nil {
 		return domain.Mission{}, err
 	}
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.AI.Name(), Model: "deepseek-v4-flash", Feature: "mission", InputTokens: 700, OutputTokens: 350, EstimatedCost: estimateCost(s.AI.Name(), "deepseek-v4-flash", 700, 350), CreatedAt: s.Now()})
+	if err := s.recordUsage(ctx, providerUsageRecord(s.AI.Name(), "deepseek-v4-flash", "mission", usage, s.Now())); err != nil {
+		return domain.Mission{}, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return domain.Mission{}, err
+		}
+	}
 	return mission, nil
 }
 
@@ -109,10 +169,16 @@ func (s *Service) SubmitWriting(ctx context.Context, missionID, answer string) (
 	if strings.TrimSpace(answer) == "" {
 		return domain.SubmissionResult{}, errors.New("answer is required")
 	}
-	if err := s.ensureBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-pro", 900, 500)); err != nil {
+	reservation, err := s.reserveBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-pro", 900, 500), "writing-evaluation")
+	if err != nil {
 		return domain.SubmissionResult{}, err
 	}
-	evaluation, err := s.AI.EvaluateWriting(ctx, ai.WritingRequest{Mission: mission, Answer: answer})
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
+	evaluation, usage, err := s.evaluateWritingWithUsage(ctx, ai.WritingRequest{Mission: mission, Answer: answer})
 	if err != nil {
 		return domain.SubmissionResult{}, err
 	}
@@ -151,7 +217,14 @@ func (s *Service) SubmitWriting(ctx context.Context, missionID, answer string) (
 			return domain.SubmissionResult{}, err
 		}
 	}
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.AI.Name(), Model: "deepseek-v4-pro", Feature: "writing-evaluation", InputTokens: 900, OutputTokens: 500, EstimatedCost: estimateCost(s.AI.Name(), "deepseek-v4-pro", 900, 500), CreatedAt: now})
+	if err := s.recordUsage(ctx, providerUsageRecord(s.AI.Name(), "deepseek-v4-pro", "writing-evaluation", usage, now)); err != nil {
+		return domain.SubmissionResult{}, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return domain.SubmissionResult{}, err
+		}
+	}
 	return domain.SubmissionResult{Attempt: attempt, Evaluation: evaluation, Mistakes: mistakes, NextReview: next}, nil
 }
 
@@ -214,17 +287,30 @@ func (s *Service) WorkImportWithURL(ctx context.Context, sourceType, title, cont
 	if err != nil {
 		return domain.WorkImportResult{}, err
 	}
-	if err := s.ensureBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-flash", 700, 350)); err != nil {
+	reservation, err := s.reserveBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-flash", 700, 350), "work-context")
+	if err != nil {
 		return domain.WorkImportResult{}, err
 	}
-	mission, err := s.AI.GenerateMission(ctx, ai.MissionRequest{LearningState: state, WorkContext: content})
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
+	mission, usage, err := s.generateMissionWithUsage(ctx, ai.MissionRequest{LearningState: state, WorkContext: content})
 	if err != nil {
 		return domain.WorkImportResult{}, err
 	}
 	if err := s.Store.SaveMission(ctx, mission); err != nil {
 		return domain.WorkImportResult{}, err
 	}
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.AI.Name(), Model: "deepseek-v4-flash", Feature: "work-context", InputTokens: 700, OutputTokens: 350, EstimatedCost: estimateCost(s.AI.Name(), "deepseek-v4-flash", 700, 350), CreatedAt: now})
+	if err := s.recordUsage(ctx, providerUsageRecord(s.AI.Name(), "deepseek-v4-flash", "work-context", usage, now)); err != nil {
+		return domain.WorkImportResult{}, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return domain.WorkImportResult{}, err
+		}
+	}
 	terms := extractTerms(content)
 	for _, term := range terms {
 		vocabulary := domain.Vocabulary{ID: "vocab-" + stableSlug(store.UserID(ctx)) + "-" + stableSlug(term), Term: term, Domain: item.Domain, Level: state.CEFR, Definition: "A useful technical term extracted from your work context.", UserContext: term + " in this work context", TechnicalExample: "Use " + term + " in a sentence about this system.", RelatedTerms: relatedTerms(term, terms), Mastery: 0.1, NextReview: now.Add(24 * time.Hour)}

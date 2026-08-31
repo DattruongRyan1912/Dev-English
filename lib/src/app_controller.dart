@@ -16,11 +16,17 @@ const VocabularyGraph _emptyVocabularyGraph = VocabularyGraph(
 );
 
 class AppController extends ChangeNotifier {
-  AppController({DevEnglishApi? api}) : _api = api ?? DevEnglishApi() {
+  AppController({DevEnglishApi? api, bool loadLegacy = true})
+    : _api = api ?? DevEnglishApi(),
+      _loadLegacy = loadLegacy {
     _api.onUnauthorized = _handleUnauthorized;
   }
 
   final DevEnglishApi _api;
+  // The product-reset shell owns Today/Work/Knowledge bootstrap. Legacy
+  // learning endpoints remain available for compatibility, but must not be a
+  // prerequisite for the new shell to render or authenticate.
+  final bool _loadLegacy;
   HomeData _home = DemoData.home;
   List<PracticeMode> _practice = DemoData.practice;
   List<ReviewItem> _review = DemoData.review;
@@ -29,12 +35,20 @@ class AppController extends ChangeNotifier {
   bool _submitting = false;
   bool _importing = false;
   bool _usingDemo = true;
+  bool _legacyLoaded = false;
+  bool _legacyLoading = false;
+  Future<bool>? _legacyLoadFuture;
+  String? _legacyError;
   String? _error;
   SubmissionResult? _lastSubmission;
   WorkImportResult? _lastWorkImport;
   List<DiagnosticQuestion> _diagnosticQuestions = DemoData.diagnosticQuestions;
+  bool _diagnosticLoading = false;
+  String? _diagnosticError;
   DiagnosticResult? _diagnosticResult;
   List<RoleplayScenario> _scenarios = DemoData.roleplayScenarios;
+  bool _roleplayLoading = false;
+  String? _roleplayError;
   Conversation? _conversation;
   RoleplayTurnResult? _lastRoleplayTurn;
   CopilotResult? _copilotResult;
@@ -42,6 +56,10 @@ class AppController extends ChangeNotifier {
   VocabularyGraph _vocabularyGraph = DemoData.vocabularyGraph;
   UsageSummary? _usageSummary;
   SettingsData _settings = DemoData.settings;
+  bool _settingsLoaded = false;
+  bool _settingsLoading = false;
+  Future<bool>? _settingsLoadFuture;
+  String? _settingsError;
   AnalyticsSummary _analytics = DemoData.analytics;
   WeeklySpeakingAssessment _weeklySpeaking = DemoData.weeklySpeaking;
   List<ProviderCheck> _providerChecks = DemoData.providerChecks;
@@ -52,6 +70,11 @@ class AppController extends ChangeNotifier {
   bool _authenticating = false;
   String? _authError;
   AuthUser? _authUser;
+  int _sessionGeneration = 0;
+
+  /// Invoked when the authenticated session is invalidated so other
+  /// user-scoped controllers can clear their in-memory state as well.
+  VoidCallback? onSessionInvalidated;
 
   HomeData get home => _home;
   List<PracticeMode> get practice => _practice;
@@ -61,13 +84,20 @@ class AppController extends ChangeNotifier {
   bool get submitting => _submitting;
   bool get importing => _importing;
   bool get usingDemo => _usingDemo;
+  bool get legacyLoaded => _legacyLoaded;
+  bool get legacyLoading => _legacyLoading;
+  String? get legacyError => _legacyError;
   bool get demoFallbackEnabled => _allowDemoFallback;
   String? get error => _error;
   SubmissionResult? get lastSubmission => _lastSubmission;
   WorkImportResult? get lastWorkImport => _lastWorkImport;
   List<DiagnosticQuestion> get diagnosticQuestions => _diagnosticQuestions;
+  bool get diagnosticLoading => _diagnosticLoading;
+  String? get diagnosticError => _diagnosticError;
   DiagnosticResult? get diagnosticResult => _diagnosticResult;
   List<RoleplayScenario> get scenarios => _scenarios;
+  bool get roleplayLoading => _roleplayLoading;
+  String? get roleplayError => _roleplayError;
   Conversation? get conversation => _conversation;
   RoleplayTurnResult? get lastRoleplayTurn => _lastRoleplayTurn;
   CopilotResult? get copilotResult => _copilotResult;
@@ -75,6 +105,9 @@ class AppController extends ChangeNotifier {
   VocabularyGraph get vocabularyGraph => _vocabularyGraph;
   UsageSummary? get usageSummary => _usageSummary;
   SettingsData get settings => _settings;
+  bool get settingsLoaded => _settingsLoaded;
+  bool get settingsLoading => _settingsLoading;
+  String? get settingsError => _settingsError;
   AnalyticsSummary get analytics => _analytics;
   WeeklySpeakingAssessment get weeklySpeaking => _weeklySpeaking;
   List<ProviderCheck> get providerChecks => _providerChecks;
@@ -86,30 +119,86 @@ class AppController extends ChangeNotifier {
   bool get authenticating => _authenticating;
   String? get authError => _authError;
   AuthUser? get authUser => _authUser;
+  String get cefr {
+    final authenticatedLevel = _authUser?.cefr.trim() ?? '';
+    if (authenticatedLevel.isNotEmpty) return authenticatedLevel;
+    final learningLevel = _home.state.cefr.trim();
+    return learningLevel.isEmpty ? 'B1' : learningLevel;
+  }
 
   Future<void> load() async {
+    final generation = _sessionGeneration;
     _loading = true;
     _error = null;
     notifyListeners();
     if (_requiresAuthentication && !_authenticated) {
       _authLoading = true;
       try {
-        _authUser = await _api.currentUser();
+        final user = await _api.currentUser();
+        if (generation != _sessionGeneration) return;
+        _authUser = user;
         _authenticated = true;
         _authError = null;
       } catch (error) {
+        if (generation != _sessionGeneration) return;
         if (error is! AuthRequiredException) {
           _authError = 'Không thể kiểm tra phiên đăng nhập. Hãy thử lại.';
         }
       } finally {
-        _authLoading = false;
+        if (generation == _sessionGeneration) _authLoading = false;
       }
+      if (generation != _sessionGeneration) return;
       if (!_authenticated) {
         _loading = false;
         notifyListeners();
         return;
       }
     }
+    if (generation != _sessionGeneration) return;
+    if (!_loadLegacy) {
+      _legacyLoaded = false;
+      _usingDemo = false;
+      _loading = false;
+      notifyListeners();
+      return;
+    }
+    await ensureLegacyLearningLoaded(allowDemoFallback: _allowDemoFallback);
+    if (generation != _sessionGeneration) return;
+    _loading = false;
+    notifyListeners();
+  }
+
+  /// Loads the compatibility learning surface only when a user opens it.
+  ///
+  /// The canonical Today/Work/Knowledge shell deliberately does not call
+  /// these legacy endpoints during bootstrap. A strict lazy load is used by
+  /// the new shell so a failed request can never expose the initial demo
+  /// objects as if they were the user's data. The explicit legacy rollback
+  /// shell may opt into the historical development fallback.
+  Future<bool> ensureLegacyLearningLoaded({bool allowDemoFallback = false}) {
+    if (_legacyLoaded) return Future<bool>.value(true);
+    final active = _legacyLoadFuture;
+    if (active != null) return active;
+
+    // Defer the async body until the future is stored. This prevents a
+    // listener triggered by the first state notification from starting a
+    // second load before the in-flight operation is visible.
+    final operation = Future<bool>(
+      () => _loadLegacyLearning(allowDemoFallback: allowDemoFallback),
+    );
+    _legacyLoadFuture = operation;
+    return operation.whenComplete(() {
+      if (identical(_legacyLoadFuture, operation)) {
+        _legacyLoadFuture = null;
+      }
+    });
+  }
+
+  Future<bool> _loadLegacyLearning({required bool allowDemoFallback}) async {
+    final generation = _sessionGeneration;
+    _legacyLoading = true;
+    _legacyError = null;
+    notifyListeners();
     try {
       final results = await Future.wait<dynamic>([
         _api.home(),
@@ -117,40 +206,55 @@ class AppController extends ChangeNotifier {
         _api.reviewDue(),
         _api.progress(),
       ]);
+      if (generation != _sessionGeneration) return false;
       _home = results[0] as HomeData;
       _practice = results[1] as List<PracticeMode>;
       _review = results[2] as List<ReviewItem>;
       _progress = results[3] as ProgressData;
-      _usingDemo = false;
+
       try {
-        _diagnosticResult = await _api.diagnosticResult();
+        final diagnosticResult = await _api.diagnosticResult();
+        if (generation != _sessionGeneration) return false;
+        _diagnosticResult = diagnosticResult;
       } catch (_) {
+        if (generation != _sessionGeneration) return false;
         _diagnosticResult = null;
       }
+
       try {
         final results = await Future.wait<dynamic>([
           _api.analytics(),
           _api.weeklySpeaking(),
         ]);
+        if (generation != _sessionGeneration) return false;
         _analytics = results[0] as AnalyticsSummary;
         _weeklySpeaking = results[1] as WeeklySpeakingAssessment;
       } catch (_) {
-        if (_allowDemoFallback) {
+        if (generation != _sessionGeneration) return false;
+        if (allowDemoFallback) {
           _analytics = DemoData.analytics;
           _weeklySpeaking = DemoData.weeklySpeaking;
         } else {
-          _usingDemo = true;
-          _error = 'Không thể tải analytics production từ backend.';
+          throw StateError('legacy analytics unavailable');
         }
       }
+
+      _legacyLoaded = true;
+      _usingDemo = false;
+      return true;
     } catch (_) {
-      _usingDemo = true;
-      _error = _allowDemoFallback
+      _legacyLoaded = false;
+      _usingDemo = allowDemoFallback;
+      _legacyError = allowDemoFallback
           ? 'Backend chưa chạy, đang hiển thị dữ liệu demo cục bộ.'
-          : 'Không thể kết nối backend production. Vui lòng thử lại.';
+          : 'Không thể tải dữ liệu Learning thật từ backend. Vui lòng thử lại.';
+      _error = _legacyError;
+      return false;
     } finally {
-      _loading = false;
-      notifyListeners();
+      if (generation == _sessionGeneration) {
+        _legacyLoading = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -175,6 +279,10 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Invalidate all in-flight user-scoped requests before waiting for the
+    // backend. Their responses must not be allowed to repopulate this
+    // controller after the session changes.
+    _sessionGeneration++;
     _authenticating = true;
     notifyListeners();
     try {
@@ -184,21 +292,70 @@ class AppController extends ChangeNotifier {
     } finally {
       _authenticated = false;
       _authUser = null;
+      _authLoading = false;
       _authenticating = false;
-      _loading = false;
-      _usingDemo = true;
+      _resetUserScopedState();
+      onSessionInvalidated?.call();
       notifyListeners();
     }
   }
 
   void _handleUnauthorized() {
     if (!_requiresAuthentication || !_authenticated) return;
+    _sessionGeneration++;
     _authenticated = false;
     _authUser = null;
     _authLoading = false;
     _authError = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
-    _loading = false;
+    _resetUserScopedState();
+    onSessionInvalidated?.call();
     notifyListeners();
+  }
+
+  void _resetUserScopedState() {
+    _loading = false;
+    _submitting = false;
+    _importing = false;
+    _usingDemo = true;
+    _error = null;
+    _lastSubmission = null;
+    _lastWorkImport = null;
+    // Do not retain another user's learning snapshot across a logout. The
+    // next authenticated session must fetch its own canonical data instead
+    // of reusing a completed compatibility load from this process.
+    _home = DemoData.home;
+    _practice = DemoData.practice;
+    _review = DemoData.review;
+    _progress = DemoData.progress;
+    _legacyLoaded = false;
+    _legacyLoading = false;
+    _legacyLoadFuture = null;
+    _legacyError = null;
+    _diagnosticQuestions = _allowDemoFallback
+        ? DemoData.diagnosticQuestions
+        : const [];
+    _diagnosticLoading = false;
+    _diagnosticError = null;
+    _diagnosticResult = null;
+    _scenarios = _allowDemoFallback ? DemoData.roleplayScenarios : const [];
+    _roleplayLoading = false;
+    _roleplayError = null;
+    _conversation = null;
+    _lastRoleplayTurn = null;
+    _copilotResult = null;
+    _vocabulary = const [];
+    _vocabularyGraph = _emptyVocabularyGraph;
+    _usageSummary = null;
+    _analytics = DemoData.analytics;
+    _weeklySpeaking = DemoData.weeklySpeaking;
+    _providerChecks = _allowDemoFallback ? DemoData.providerChecks : const [];
+    _speakingSession = null;
+    _working = false;
+    _settings = DemoData.settings;
+    _settingsLoaded = false;
+    _settingsLoading = false;
+    _settingsLoadFuture = null;
+    _settingsError = null;
   }
 
   Future<void> submitWriting(String missionId, String answer) async {
@@ -274,12 +431,18 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> loadDiagnostic() async {
+    _diagnosticLoading = true;
+    _diagnosticError = null;
+    _diagnosticQuestions = const [];
+    notifyListeners();
     try {
       _diagnosticQuestions = await _api.diagnosticQuestions();
-      notifyListeners();
     } catch (_) {
       if (!_allowDemoFallback) _diagnosticQuestions = const [];
-      _error = 'Không thể tải bài diagnostic lúc này.';
+      _diagnosticError = 'Không thể tải bài diagnostic lúc này.';
+      _error = _diagnosticError;
+    } finally {
+      _diagnosticLoading = false;
       notifyListeners();
     }
   }
@@ -317,12 +480,18 @@ class AppController extends ChangeNotifier {
   }
 
   Future<void> loadRoleplay() async {
+    _roleplayLoading = true;
+    _roleplayError = null;
+    _scenarios = const [];
+    notifyListeners();
     try {
       _scenarios = await _api.roleplayScenarios();
-      notifyListeners();
     } catch (_) {
       if (!_allowDemoFallback) _scenarios = const [];
-      _error = 'Không thể tải roleplay scenarios lúc này.';
+      _roleplayError = 'Không thể tải roleplay scenarios lúc này.';
+      _error = _roleplayError;
+    } finally {
+      _roleplayLoading = false;
       notifyListeners();
     }
   }
@@ -365,90 +534,52 @@ class AppController extends ChangeNotifier {
 
   Future<void> sendRoleplayTurn(String answer) async {
     final conversation = _conversation;
-    if (conversation == null || answer.trim().isEmpty) return;
+    final trimmed = answer.trim();
+    if (conversation == null || trimmed.isEmpty || _working) return;
+    _conversation = Conversation(
+      id: conversation.id,
+      roleplayType: conversation.roleplayType,
+      context: conversation.context,
+      messages: [
+        ...conversation.messages,
+        Message(
+          id: 'pending-user-${conversation.messages.length}',
+          role: 'user',
+          content: trimmed,
+        ),
+      ],
+    );
     _working = true;
     _error = null;
     notifyListeners();
     try {
-      _lastRoleplayTurn = await _api.roleplayTurn(conversation.id, answer);
+      _lastRoleplayTurn = await _api.roleplayTurn(conversation.id, trimmed);
       _conversation = _lastRoleplayTurn!.conversation;
     } catch (_) {
       if (!_allowDemoFallback) {
         _error = 'Không thể gửi lượt roleplay production lúc này.';
         return;
       }
-      final lowerAnswer = answer.toLowerCase();
-      final normalizedAnswer = lowerAnswer
-          .replaceAll(RegExp(r'\s+'), ' ')
-          .trim();
-      final asksForGuidance =
-          RegExp(
-            r'^(help|help me|need help|i need help|'
-            r'can you help me( .*)?|could you help me( .*)?|'
-            r'please help me( .*)?|i need guidance( .*)?|'
-            r'can you guide me( .*)?|please guide me( .*)?|'
-            r'i don'
-            't know how to answer( .*)?|'
-            r'i dont know how to answer( .*)?)\??$',
-          ).hasMatch(normalizedAnswer) ||
-          const [
-            'chưa biết cách trả lời',
-            'chua biet cach tra loi',
-            'không biết cách trả lời',
-            'khong biet cach tra loi',
-            'hướng dẫn tôi',
-            'huong dan toi',
-            'hướng dẫn mình',
-            'huong dan minh',
-            'giúp tôi trả lời',
-            'giup toi tra loi',
-            'giúp mình trả lời',
-            'giup minh tra loi',
-            'giúp tôi với',
-            'giup toi voi',
-            'giúp mình với',
-            'giup minh voi',
-          ].any(normalizedAnswer.contains);
-      final reply = asksForGuidance
-          ? 'Không sao. Let’s build the answer step by step. Start with: '
-                '"The issue happens when ____. It affects ____. My next step is to ____."'
-          : lowerAnswer.contains('impact')
+      final reply = trimmed.toLowerCase().contains('impact')
           ? 'Good. How will you validate the fix and communicate the result?'
           : 'What evidence supports that explanation, and what is the user impact?';
       final evaluation = EvaluationResult(
-        score: asksForGuidance
-            ? 0
-            : answer.trim().split(RegExp(r'\s+')).length >= 12
-            ? 72
-            : 58,
-        summary: asksForGuidance
-            ? 'Guidance requested; this turn was not scored.'
-            : 'The explanation is understandable and work-focused.',
-        good: asksForGuidance
-            ? const ['You asked for help clearly.']
-            : const ['You responded to the technical context.'],
-        mainIssue: asksForGuidance
-            ? 'Use the starter sentence and replace each blank with one verified detail.'
-            : 'Connect evidence, impact and next step more explicitly.',
-        nextAction: asksForGuidance
-            ? 'Use the starter sentence: write one short sentence about the evidence first, then send it.'
-            : 'Answer once more with evidence, impact and next step.',
+        score: trimmed.split(RegExp(r'\s+')).length >= 12 ? 72 : 58,
+        summary: 'The explanation is understandable and work-focused.',
+        good: const ['You responded to the technical context.'],
+        mainIssue: 'Connect evidence, impact and next step more explicitly.',
+        nextAction: 'Answer once more with evidence, impact and next step.',
         corrections: const [],
-        scored: !asksForGuidance,
       );
+      final pending = _conversation ?? conversation;
       _conversation = Conversation(
-        id: conversation.id,
-        roleplayType: conversation.roleplayType,
-        context: conversation.context,
+        id: pending.id,
+        roleplayType: pending.roleplayType,
+        context: pending.context,
         messages: [
-          ...conversation.messages,
+          ...pending.messages,
           Message(
-            id: 'demo-user-${conversation.messages.length}',
-            role: 'user',
-            content: answer,
-          ),
-          Message(
-            id: 'demo-reply-${conversation.messages.length}',
+            id: 'demo-reply-${pending.messages.length}',
             role: 'assistant',
             content: reply,
           ),
@@ -523,28 +654,63 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  Future<void> loadSettingsData() async {
+  Future<bool> loadSettingsData({bool allowDemoFallback = _allowDemoFallback}) {
+    if (_settingsLoaded) return Future<bool>.value(true);
+    final active = _settingsLoadFuture;
+    if (active != null) return active;
+
+    // Store the future before starting the body so concurrent screens share
+    // one request and cannot overwrite settings with different snapshots.
+    final operation = Future<bool>(
+      () => _loadSettingsData(allowDemoFallback: allowDemoFallback),
+    );
+    _settingsLoadFuture = operation;
+    return operation.whenComplete(() {
+      if (identical(_settingsLoadFuture, operation)) {
+        _settingsLoadFuture = null;
+      }
+    });
+  }
+
+  Future<bool> _loadSettingsData({required bool allowDemoFallback}) async {
+    final generation = _sessionGeneration;
+    _settingsLoading = true;
+    _settingsError = null;
+    notifyListeners();
     try {
       final results = await Future.wait<dynamic>([
         _api.usage(),
         _api.testConnections(),
         _api.settings(),
       ]);
+      if (generation != _sessionGeneration) return false;
       _usageSummary = results[0] as UsageSummary;
       _providerChecks = results[1] as List<ProviderCheck>;
       _settings = results[2] as SettingsData;
+      _settingsLoaded = true;
+      return true;
     } catch (_) {
-      if (_allowDemoFallback) {
+      if (generation != _sessionGeneration) return false;
+      _settingsLoaded = false;
+      if (allowDemoFallback) {
         _usageSummary = DemoData.usage;
         _providerChecks = DemoData.providerChecks;
         _settings = DemoData.settings;
       } else {
         _usageSummary = null;
         _providerChecks = const [];
-        _error = 'Không thể tải cấu hình provider production lúc này.';
+        _settingsError = 'Không thể tải cấu hình provider production lúc này.';
+      }
+      _error = allowDemoFallback
+          ? 'Không thể tải cấu hình provider lúc này.'
+          : _settingsError;
+      return false;
+    } finally {
+      if (generation == _sessionGeneration) {
+        _settingsLoading = false;
+        notifyListeners();
       }
     }
-    notifyListeners();
   }
 
   Future<void> testConnections() async {

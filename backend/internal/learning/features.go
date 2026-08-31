@@ -11,6 +11,7 @@ import (
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/ai"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/store"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/usageguard"
 )
 
 var ErrBudgetExceeded = errors.New("monthly AI budget would be exceeded")
@@ -198,24 +199,43 @@ func (s *Service) RoleplayTurn(ctx context.Context, request domain.RoleplayTurnR
 	if err != nil {
 		return domain.RoleplayTurnResult{}, err
 	}
-	provider, ok := s.AI.(ai.RoleplayProvider)
+	_, ok := s.AI.(ai.RoleplayProvider)
 	if !ok {
 		return domain.RoleplayTurnResult{}, errors.New("roleplay provider is unavailable")
 	}
-	if err := s.ensureBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-pro", 800, 500)); err != nil {
-		return domain.RoleplayTurnResult{}, err
-	}
-	result, err := provider.GenerateRoleplay(ctx, ai.RoleplayRequest{Scenario: scenario, Conversation: conversation, Answer: request.Answer})
+	reservation, err := s.reserveBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-pro", 800, 500), "roleplay")
 	if err != nil {
 		return domain.RoleplayTurnResult{}, err
 	}
-	result.Evaluation.Score = ai.FinalWritingScore(domain.Mission{ExpectedPoints: []string{"reason", "impact", "next step"}}, request.Answer, result.Evaluation)
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
+	result, usage, err := s.generateRoleplayWithUsage(ctx, ai.RoleplayRequest{Scenario: scenario, Conversation: conversation, Answer: request.Answer})
+	if err != nil {
+		return domain.RoleplayTurnResult{}, err
+	}
+	if result.GuidanceOnly {
+		result.Evaluation.Score = 0
+		result.Evaluation.WhatWasGood = nil
+		result.Evaluation.TechnicalPoints = nil
+	} else {
+		result.Evaluation.Score = ai.FinalWritingScore(domain.Mission{ExpectedPoints: []string{"reason", "impact", "next step"}}, request.Answer, result.Evaluation)
+	}
 	now := s.Now()
 	conversation.Messages = append(conversation.Messages, domain.Message{ID: fmt.Sprintf("message-%d-user", now.UnixNano()), Role: "user", Content: strings.TrimSpace(request.Answer), CreatedAt: now}, domain.Message{ID: fmt.Sprintf("message-%d-assistant", now.UnixNano()), Role: "assistant", Content: result.Reply, CreatedAt: now.Add(time.Nanosecond)})
 	if err := s.Store.SaveConversation(ctx, conversation); err != nil {
 		return domain.RoleplayTurnResult{}, err
 	}
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.AI.Name(), Model: "deepseek-v4-pro", Feature: "roleplay", InputTokens: len(strings.Fields(request.Answer)) * 2, OutputTokens: len(strings.Fields(result.Reply)) * 2, EstimatedCost: estimateCost(s.AI.Name(), "deepseek-v4-pro", len(strings.Fields(request.Answer))*2, len(strings.Fields(result.Reply))*2), CreatedAt: now})
+	if err := s.recordUsage(ctx, providerUsageRecord(s.AI.Name(), "deepseek-v4-pro", "roleplay", usage, now)); err != nil {
+		return domain.RoleplayTurnResult{}, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return domain.RoleplayTurnResult{}, err
+		}
+	}
 	return domain.RoleplayTurnResult{Conversation: conversation, Reply: conversation.Messages[len(conversation.Messages)-1], Feedback: result.Evaluation}, nil
 }
 
@@ -236,19 +256,32 @@ func (s *Service) Copilot(ctx context.Context, request domain.CopilotRequest) (d
 	if strings.TrimSpace(request.Vietnamese) == "" {
 		return domain.CopilotResult{}, errors.New("vietnamese text is required")
 	}
-	provider, ok := s.AI.(ai.CopilotProvider)
+	_, ok := s.AI.(ai.CopilotProvider)
 	if !ok {
 		return domain.CopilotResult{}, errors.New("copilot provider is unavailable")
 	}
-	if err := s.ensureBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-flash", 500, 300)); err != nil {
+	reservation, err := s.reserveBudget(ctx, estimateCost(s.AI.Name(), "deepseek-v4-flash", 500, 300), "copilot")
+	if err != nil {
 		return domain.CopilotResult{}, err
 	}
-	result, err := provider.GenerateCopilot(ctx, ai.CopilotRequest{Vietnamese: request.Vietnamese, Context: request.Context})
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
+	result, usage, err := s.generateCopilotWithUsage(ctx, ai.CopilotRequest{Vietnamese: request.Vietnamese, Context: request.Context})
 	if err != nil {
 		return domain.CopilotResult{}, err
 	}
 	now := s.Now()
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.AI.Name(), Model: "deepseek-v4-flash", Feature: "copilot", InputTokens: len(strings.Fields(request.Vietnamese)) * 2, OutputTokens: len(strings.Fields(result.Professional)) * 2, EstimatedCost: estimateCost(s.AI.Name(), "deepseek-v4-flash", len(strings.Fields(request.Vietnamese))*2, len(strings.Fields(result.Professional))*2), CreatedAt: now})
+	if err := s.recordUsage(ctx, providerUsageRecord(s.AI.Name(), "deepseek-v4-flash", "copilot", usage, now)); err != nil {
+		return domain.CopilotResult{}, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return domain.CopilotResult{}, err
+		}
+	}
 	return result, nil
 }
 
@@ -288,9 +321,15 @@ func (s *Service) TranscribeAudio(ctx context.Context, missionID, mimeType strin
 	if s.STT == nil || !s.STT.Configured() {
 		return domain.SpeakingSession{}, ai.ErrProviderUnavailable
 	}
-	if err := s.ensureBudget(ctx, estimateSpeechCost(s.STT.Name(), "stt", 1)); err != nil {
+	reservation, err := s.reserveBudget(ctx, estimateSpeechCost(s.STT.Name(), "stt", 1), "stt")
+	if err != nil {
 		return domain.SpeakingSession{}, err
 	}
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
 	transcript, err := s.STT.Transcribe(ctx, audio, mimeType)
 	if err != nil {
 		return domain.SpeakingSession{}, err
@@ -301,7 +340,14 @@ func (s *Service) TranscribeAudio(ctx context.Context, missionID, mimeType strin
 	if err := s.Store.SaveSpeakingSession(ctx, session); err != nil {
 		return domain.SpeakingSession{}, err
 	}
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.STT.Name(), Model: "whisper-large-v3", Feature: "stt", AudioSeconds: 0, EstimatedCost: estimateSpeechCost(s.STT.Name(), "stt", 1), CreatedAt: now})
+	if err := s.recordUsage(ctx, domain.UsageRecord{Provider: s.STT.Name(), Model: "whisper-large-v3", Feature: "stt", UsageAvailable: false, CreatedAt: now}); err != nil {
+		return domain.SpeakingSession{}, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return domain.SpeakingSession{}, err
+		}
+	}
 	return session, nil
 }
 
@@ -323,9 +369,15 @@ func (s *Service) AssessSpeaking(ctx context.Context, sessionID, mimeType, refer
 	if s.Pronunciation == nil || !s.Pronunciation.Configured() {
 		return domain.SpeakingSession{}, ai.ErrProviderUnavailable
 	}
-	if err := s.ensureBudget(ctx, estimateSpeechCost(s.Pronunciation.Name(), "pronunciation", 1)); err != nil {
+	reservation, err := s.reserveBudget(ctx, estimateSpeechCost(s.Pronunciation.Name(), "pronunciation", 1), "pronunciation")
+	if err != nil {
 		return domain.SpeakingSession{}, err
 	}
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
 	session, err := s.Store.SpeakingSession(ctx, sessionID)
 	if err != nil {
 		return domain.SpeakingSession{}, err
@@ -345,7 +397,14 @@ func (s *Service) AssessSpeaking(ctx context.Context, sessionID, mimeType, refer
 		return domain.SpeakingSession{}, err
 	}
 	now := s.Now()
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.Pronunciation.Name(), Model: "azure-pronunciation-prosody", Feature: "pronunciation", EstimatedCost: estimateSpeechCost(s.Pronunciation.Name(), "pronunciation", 1), CreatedAt: now})
+	if err := s.recordUsage(ctx, domain.UsageRecord{Provider: s.Pronunciation.Name(), Model: "azure-pronunciation-prosody", Feature: "pronunciation", UsageAvailable: false, CreatedAt: now}); err != nil {
+		return domain.SpeakingSession{}, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return domain.SpeakingSession{}, err
+		}
+	}
 	return session, nil
 }
 
@@ -357,25 +416,38 @@ func (s *Service) Synthesize(ctx context.Context, text, voice string) ([]byte, e
 	if text == "" || len([]rune(text)) > 5000 {
 		return nil, errors.New("text must contain between 1 and 5000 characters")
 	}
-	if err := s.ensureBudget(ctx, estimateSpeechCost(s.TTS.Name(), "tts", len([]rune(text)))); err != nil {
+	reservation, err := s.reserveBudget(ctx, estimateSpeechCost(s.TTS.Name(), "tts", len([]rune(text))), "tts")
+	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if reservation != nil {
+			_ = reservation.Release(ctx)
+		}
+	}()
 	audio, err := s.TTS.Synthesize(ctx, text, voice)
 	if err != nil {
 		return nil, err
 	}
 	now := s.Now()
-	_ = s.recordUsage(ctx, domain.UsageRecord{Provider: s.TTS.Name(), Model: "azure-neural-tts", Feature: "tts", TTSCharacters: len([]rune(text)), EstimatedCost: estimateSpeechCost(s.TTS.Name(), "tts", len([]rune(text))), CreatedAt: now})
+	if err := s.recordUsage(ctx, domain.UsageRecord{Provider: s.TTS.Name(), Model: "azure-neural-tts", Feature: "tts", TTSCharacters: len([]rune(text)), UsageAvailable: false, CreatedAt: now}); err != nil {
+		return nil, err
+	}
+	if reservation != nil {
+		if err := reservation.Commit(ctx); err != nil {
+			return nil, err
+		}
+	}
 	return audio, nil
 }
 
-func (s *Service) ensureBudget(ctx context.Context, estimate float64) error {
+func (s *Service) reserveBudget(ctx context.Context, estimate float64, feature string) (*usageguard.Reservation, error) {
 	if estimate <= 0 {
-		return nil
+		return nil, nil
 	}
 	settings, err := s.Store.Settings(ctx)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	budget := settings.MonthlyBudgetVND
 	if budget <= 0 || budget > 300000 {
@@ -383,18 +455,26 @@ func (s *Service) ensureBudget(ctx context.Context, estimate float64) error {
 	}
 	now := s.Now()
 	from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	records, err := s.Store.Usage(ctx, from)
+	guard := s.BudgetGuard
+	if guard == nil {
+		guard = usageguard.New()
+		s.BudgetGuard = guard
+	}
+	reservation, err := guard.Reserve(ctx, s.Store, store.UsageReservationRequest{
+		UserID:     store.UserID(ctx),
+		MonthStart: from,
+		Feature:    feature,
+		Metric:     store.UsageMetricCost,
+		Amount:     estimate,
+		Limit:      float64(budget),
+	})
+	if errors.Is(err, usageguard.ErrBudgetExceeded) {
+		return nil, ErrBudgetExceeded
+	}
 	if err != nil {
-		return err
+		return nil, err
 	}
-	used := 0.0
-	for _, record := range records {
-		used += record.EstimatedCost
-	}
-	if used+estimate > float64(budget) {
-		return ErrBudgetExceeded
-	}
-	return nil
+	return reservation, nil
 }
 
 func estimateSpeechCost(provider, feature string, units int) float64 {
@@ -421,14 +501,18 @@ func (s *Service) UsageSummary(ctx context.Context) (domain.UsageSummary, error)
 		return domain.UsageSummary{}, err
 	}
 	total := 0.0
+	unavailable := 0
 	for _, record := range records {
 		total += record.EstimatedCost
+		if !record.UsageAvailable {
+			unavailable++
+		}
 	}
 	used := 0.0
 	if settings.MonthlyBudgetVND > 0 {
 		used = total / float64(settings.MonthlyBudgetVND) * 100
 	}
-	return domain.UsageSummary{Month: now.Format("2006-01"), EstimatedCost: total, BudgetVND: settings.MonthlyBudgetVND, BudgetUsedPercent: used, Records: records}, nil
+	return domain.UsageSummary{Month: now.Format("2006-01"), EstimatedCost: total, BudgetVND: settings.MonthlyBudgetVND, BudgetUsedPercent: used, UnavailableRecords: unavailable, Records: records}, nil
 }
 
 func (s *Service) ExportData(ctx context.Context) (map[string]any, error) {
@@ -477,6 +561,26 @@ func (s *Service) recordUsage(ctx context.Context, record domain.UsageRecord) er
 		record.CreatedAt = s.Now()
 	}
 	return s.Store.SaveUsage(ctx, record)
+}
+
+func providerUsageRecord(provider, fallbackModel, feature string, usage ai.JSONUsage, createdAt time.Time) domain.UsageRecord {
+	record := domain.UsageRecord{
+		Provider:       provider,
+		Model:          fallbackModel,
+		Feature:        feature,
+		UsageAvailable: usage.Available,
+		CreatedAt:      createdAt,
+	}
+	if strings.TrimSpace(usage.Model) != "" {
+		record.Model = usage.Model
+	}
+	if !usage.Available {
+		return record
+	}
+	record.InputTokens = usage.InputTokens
+	record.OutputTokens = usage.OutputTokens
+	record.EstimatedCost = estimateCost(provider, record.Model, record.InputTokens, record.OutputTokens)
+	return record
 }
 
 func estimateCost(provider, model string, input, output int) float64 {

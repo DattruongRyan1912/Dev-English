@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart' as http_parser;
 
 import 'http_client.dart';
 import 'models.dart';
@@ -15,6 +14,22 @@ class AuthRequiredException implements Exception {
   String toString() => message;
 }
 
+/// A safe, structured API failure that the UI can use for conflict and quota
+/// handling without parsing provider-specific error strings.
+class ApiException implements Exception {
+  const ApiException(this.statusCode, this.message, {this.code});
+
+  final int statusCode;
+  final String message;
+  final String? code;
+
+  bool get isConflict => statusCode == 409;
+
+  @override
+  String toString() =>
+      'ApiException($statusCode${code == null ? '' : ', $code'}): $message';
+}
+
 class DevEnglishApi {
   static const defaultWorkContextTimeout = Duration(seconds: 90);
 
@@ -22,10 +37,8 @@ class DevEnglishApi {
     http.Client? client,
     String? baseUrl,
     Duration? workContextTimeout,
-    Duration? speechTimeout,
   }) : _client = client ?? createHttpClient(),
        _workContextTimeout = workContextTimeout ?? defaultWorkContextTimeout,
-       _speechTimeout = speechTimeout ?? const Duration(seconds: 30),
        baseUrl =
            baseUrl ??
            const String.fromEnvironment(
@@ -35,7 +48,6 @@ class DevEnglishApi {
 
   final http.Client _client;
   final Duration _workContextTimeout;
-  final Duration _speechTimeout;
   final String baseUrl;
   void Function()? onUnauthorized;
 
@@ -128,9 +140,11 @@ class DevEnglishApi {
     String conversationId,
     String answer,
   ) async => RoleplayTurnResult.fromJson(
-    await _post('/api/v1/roleplay/conversations/$conversationId/turns', {
-      'answer': answer,
-    }),
+    await _post(
+      '/api/v1/roleplay/conversations/$conversationId/turns',
+      {'answer': answer},
+      timeout: const Duration(seconds: 90),
+    ),
   );
 
   Future<CopilotResult> copilot({
@@ -256,6 +270,250 @@ class DevEnglishApi {
         await _post('/api/v1/integrations/github/import', {'url': url}),
       );
 
+  // Product-reset endpoints intentionally live under v2 so the legacy
+  // learning contract can remain compatible during the cutover.
+  Future<Map<String, dynamic>> workspaceBootstrap({
+    bool includeTrashed = false,
+  }) async => _get(
+    '/api/v2/bootstrap?includeTrashed=$includeTrashed',
+    timeout: const Duration(seconds: 15),
+  );
+
+  Future<Map<String, dynamic>> workspaceCreateProject({
+    required String name,
+    String description = '',
+    required String idempotencyKey,
+  }) async => _post(
+    '/api/v2/projects',
+    {'name': name, 'description': description},
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceCreateTask({
+    required String projectId,
+    required String title,
+    String description = '',
+    String priority = 'normal',
+    required String idempotencyKey,
+  }) async => _post(
+    '/api/v2/projects/$projectId/tasks',
+    {'title': title, 'description': description, 'priority': priority},
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceUpdateProject({
+    required String projectId,
+    String? name,
+    String? description,
+    String? status,
+    required int expectedVersion,
+    required String idempotencyKey,
+  }) async => _patch(
+    '/api/v2/projects/$projectId',
+    {
+      'name': ?name,
+      'description': ?description,
+      'status': ?status,
+      'expectedVersion': expectedVersion,
+    },
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceUpdateTask({
+    required String taskId,
+    String? projectId,
+    String? title,
+    String? description,
+    String? status,
+    String? priority,
+    required int expectedVersion,
+    required String idempotencyKey,
+  }) async => _patch(
+    '/api/v2/tasks/$taskId',
+    {
+      'projectId': ?projectId,
+      'title': ?title,
+      'description': ?description,
+      'status': ?status,
+      'priority': ?priority,
+      'expectedVersion': expectedVersion,
+    },
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceCreateDecision({
+    String projectId = '',
+    required String title,
+    String context = '',
+    required String outcome,
+    String rationale = '',
+    String status = 'proposed',
+    required String idempotencyKey,
+  }) async => _post(
+    '/api/v2/decisions',
+    {
+      'projectId': projectId,
+      'title': title,
+      'context': context,
+      'outcome': outcome,
+      'rationale': rationale,
+      'status': status,
+    },
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceUpdateDecision({
+    required String decisionId,
+    String? projectId,
+    String? title,
+    String? context,
+    String? outcome,
+    String? rationale,
+    String? status,
+    required int expectedVersion,
+    required String idempotencyKey,
+  }) async => _patch(
+    '/api/v2/decisions/$decisionId',
+    {
+      'projectId': ?projectId,
+      'title': ?title,
+      'context': ?context,
+      'outcome': ?outcome,
+      'rationale': ?rationale,
+      'status': ?status,
+      'expectedVersion': expectedVersion,
+    },
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceProjectHistory(String projectId) =>
+      _get('/api/v2/projects/$projectId/history');
+
+  Future<Map<String, dynamic>> workspaceTaskHistory(String taskId) =>
+      _get('/api/v2/tasks/$taskId/history');
+
+  Future<Map<String, dynamic>> workspaceDecisionHistory(String decisionId) =>
+      _get('/api/v2/decisions/$decisionId/history');
+
+  Future<Map<String, dynamic>> workspaceStateMutation({
+    required String path,
+    required int expectedVersion,
+    required String idempotencyKey,
+  }) async => _post(
+    path,
+    {'expectedVersion': expectedVersion},
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceImportManualSource({
+    required String name,
+    required String content,
+    required String idempotencyKey,
+    String kind = 'manual',
+    String uri = '',
+    String mimeType = 'text/plain',
+  }) async => _post(
+    '/api/v2/knowledge/sources',
+    {
+      'name': name,
+      'content': content,
+      'kind': kind,
+      'uri': uri,
+      'mimeType': mimeType,
+    },
+    extraHeaders: {'Idempotency-Key': idempotencyKey},
+  );
+
+  Future<Map<String, dynamic>> workspaceKnowledgeSourceDetail(
+    String sourceId,
+  ) => _get('/api/v2/knowledge/sources/$sourceId/detail');
+
+  Future<Map<String, dynamic>> workspaceSearchKnowledge(
+    String query, {
+    int limit = 20,
+  }) async {
+    final encodedQuery = Uri.encodeQueryComponent(query.trim());
+    return _get(
+      '/api/v2/knowledge/search?q=$encodedQuery&limit=$limit',
+      timeout: const Duration(seconds: 15),
+    );
+  }
+
+  Future<Map<String, dynamic>> workspaceSyncDrive({
+    String cursor = '',
+    int pageSize = 100,
+  }) async => _post('/api/v2/connectors/drive/sync', {
+    'cursor': cursor,
+    'pageSize': pageSize,
+  }, timeout: const Duration(seconds: 90));
+
+  Future<Map<String, dynamic>> workspaceSyncGitHub({
+    required String repository,
+    String cursor = '',
+    int pageSize = 100,
+  }) async => _post('/api/v2/connectors/github/sync', {
+    'repository': repository,
+    'cursor': cursor,
+    'pageSize': pageSize,
+  }, timeout: const Duration(seconds: 90));
+
+  Future<Map<String, dynamic>> workspaceStartConversation(
+    String message, {
+    Map<String, dynamic>? context,
+  }) async => _post('/api/v2/assistant/conversations', {
+    'message': message,
+    ...?context,
+  });
+
+  Future<Map<String, dynamic>> workspaceSendMessage(
+    String conversationId,
+    String message,
+  ) async => _post('/api/v2/assistant/conversations/$conversationId/messages', {
+    'message': message,
+  });
+
+  Future<Map<String, dynamic>> workspaceListConversations({
+    int limit = 20,
+  }) async => _get(
+    '/api/v2/assistant/conversations?limit=$limit',
+    timeout: const Duration(seconds: 15),
+  );
+
+  Future<Map<String, dynamic>> workspaceGetConversation(
+    String conversationId,
+  ) async => _get(
+    '/api/v2/assistant/conversations/${Uri.encodeComponent(conversationId)}',
+    timeout: const Duration(seconds: 15),
+  );
+
+  Future<Map<String, dynamic>> workspaceCreateActionChallenge(
+    Map<String, dynamic> body,
+  ) async => _post('/api/v2/actions/challenges', body);
+
+  Future<Map<String, dynamic>> workspaceConfirmAction(
+    Map<String, dynamic> body,
+  ) async => _post('/api/v2/actions/confirm', body);
+
+  Future<Map<String, dynamic>> workspaceRecordLearningObservation({
+    required String sourceType,
+    String sourceId = '',
+    required String skill,
+    required String prompt,
+    required String response,
+    String feedback = '',
+  }) async => _post('/api/v2/learning/observations', {
+    'sourceType': sourceType,
+    'sourceId': sourceId,
+    'skill': skill,
+    'prompt': prompt,
+    'response': response,
+    'feedback': feedback,
+  });
+
+  Future<Map<String, dynamic>> workspaceListLearningObservations({
+    int limit = 20,
+  }) => _get('/api/v2/learning/observations?limit=$limit');
+
   Future<Map<String, dynamic>> _get(
     String path, {
     Duration timeout = const Duration(seconds: 5),
@@ -270,11 +528,34 @@ class DevEnglishApi {
     String path,
     Map<String, dynamic> body, {
     Duration timeout = const Duration(seconds: 20),
+    Map<String, String>? extraHeaders,
   }) async {
     final response = await _client
         .post(
           Uri.parse('$baseUrl$path'),
-          headers: _headers({'content-type': 'application/json'}),
+          headers: _headers({
+            'content-type': 'application/json',
+            ...?extraHeaders,
+          }),
+          body: jsonEncode(body),
+        )
+        .timeout(timeout);
+    return _decode(response);
+  }
+
+  Future<Map<String, dynamic>> _patch(
+    String path,
+    Map<String, dynamic> body, {
+    Duration timeout = const Duration(seconds: 20),
+    Map<String, String>? extraHeaders,
+  }) async {
+    final response = await _client
+        .patch(
+          Uri.parse('$baseUrl$path'),
+          headers: _headers({
+            'content-type': 'application/json',
+            ...?extraHeaders,
+          }),
           body: jsonEncode(body),
         )
         .timeout(timeout);
@@ -314,17 +595,13 @@ class DevEnglishApi {
         http.MultipartFile.fromBytes(
           'audio',
           bytes,
-          contentType: http_parser.MediaType.parse(mimeType),
           filename: mimeType.contains('wav')
               ? 'recording.wav'
               : 'recording.webm',
         ),
       );
     request.headers.addAll(_headers());
-    final response = await _client
-        .send(request)
-        .then(http.Response.fromStream)
-        .timeout(_speechTimeout);
+    final response = await _client.send(request).then(http.Response.fromStream);
     return _decode(response);
   }
 
@@ -333,15 +610,17 @@ class DevEnglishApi {
         ? <String, dynamic>{}
         : jsonDecode(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      final rawError = _map(decoded)['error'];
+      final envelope = _map(decoded);
+      final rawError = envelope['error'];
       final message = rawError is Map
           ? rawError['message']?.toString() ?? 'Request failed'
           : rawError?.toString() ?? 'Request failed';
+      final code = rawError is Map ? rawError['code']?.toString() : null;
       if (response.statusCode == 401) {
         onUnauthorized?.call();
         throw AuthRequiredException(message);
       }
-      throw Exception(message);
+      throw ApiException(response.statusCode, message, code: code);
     }
     return _map(decoded);
   }

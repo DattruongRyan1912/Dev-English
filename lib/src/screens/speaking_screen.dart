@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:record/record.dart';
 
@@ -138,11 +137,12 @@ class _SpeakingScreenState extends State<SpeakingScreen> {
       });
       try {
         await _recorder.stop().timeout(const Duration(seconds: 10));
+        await Future<void>.delayed(const Duration(milliseconds: 150));
         await _recordingSubscription?.cancel();
         _recordingSubscription = null;
       } catch (_) {
         if (mounted) {
-          setState(() => _state = 'Provider/network failure — Retry');
+          setState(() => _state = 'Could not stop microphone — Retry');
         }
         return;
       }
@@ -183,20 +183,34 @@ class _SpeakingScreenState extends State<SpeakingScreen> {
     }
     _audio.clear();
     try {
+      // startStream only supports PCM16 (and AAC on some platforms). Opus is
+      // file-only on Android, so a stream records nothing and stop looks like
+      // a capture failure.
       final stream = await _recorder
           .startStream(
             const RecordConfig(
-              encoder: kIsWeb ? AudioEncoder.pcm16bits : AudioEncoder.opus,
+              encoder: AudioEncoder.pcm16bits,
               sampleRate: 16000,
               numChannels: 1,
-              echoCancel: true,
-              noiseSuppress: true,
+              androidConfig: AndroidRecordConfig(
+                manageBluetooth: false,
+                audioSource: AndroidAudioSource.voiceRecognition,
+              ),
             ),
           )
           .timeout(const Duration(seconds: 10));
-      _recordingSubscription = stream.listen(_audio.addAll);
+      _recordingSubscription = stream.listen(
+        _audio.addAll,
+        onError: (_) {
+          if (mounted) {
+            setState(() => _state = 'Microphone stream failed — Retry');
+          }
+        },
+      );
     } catch (_) {
-      if (mounted) setState(() => _state = 'Provider/network failure — Retry');
+      if (mounted) {
+        setState(() => _state = 'Could not start microphone — Retry');
+      }
       return;
     }
     if (mounted) {
@@ -271,30 +285,30 @@ class _SpeakingScreenState extends State<SpeakingScreen> {
     }
   }
 
-  String get _audioMimeType => kIsWeb ? 'audio/wav' : 'audio/webm';
+  String get _audioMimeType => 'audio/wav';
 
-  List<int> _audioForUpload() {
-    if (!kIsWeb) return List<int>.from(_audio);
+  List<int> _audioForUpload() => wrapPcm16AsWav(_audio);
+}
 
-    final pcm = Uint8List.fromList(_audio);
-    final wav = ByteData(44 + pcm.length);
-    _writeAscii(wav, 0, 'RIFF');
-    wav.setUint32(4, 36 + pcm.length, Endian.little);
-    _writeAscii(wav, 8, 'WAVE');
-    _writeAscii(wav, 12, 'fmt ');
-    wav.setUint32(16, 16, Endian.little);
-    wav.setUint16(20, 1, Endian.little);
-    wav.setUint16(22, 1, Endian.little);
-    wav.setUint32(24, 16000, Endian.little);
-    wav.setUint32(28, 32000, Endian.little);
-    wav.setUint16(32, 2, Endian.little);
-    wav.setUint16(34, 16, Endian.little);
-    _writeAscii(wav, 36, 'data');
-    wav.setUint32(40, pcm.length, Endian.little);
-    final result = wav.buffer.asUint8List();
-    result.setRange(44, result.length, pcm);
-    return result;
-  }
+Uint8List wrapPcm16AsWav(List<int> pcmBytes, {int sampleRate = 16000}) {
+  final pcm = Uint8List.fromList(pcmBytes);
+  final wav = ByteData(44 + pcm.length);
+  _writeAscii(wav, 0, 'RIFF');
+  wav.setUint32(4, 36 + pcm.length, Endian.little);
+  _writeAscii(wav, 8, 'WAVE');
+  _writeAscii(wav, 12, 'fmt ');
+  wav.setUint32(16, 16, Endian.little);
+  wav.setUint16(20, 1, Endian.little);
+  wav.setUint16(22, 1, Endian.little);
+  wav.setUint32(24, sampleRate, Endian.little);
+  wav.setUint32(28, sampleRate * 2, Endian.little);
+  wav.setUint16(32, 2, Endian.little);
+  wav.setUint16(34, 16, Endian.little);
+  _writeAscii(wav, 36, 'data');
+  wav.setUint32(40, pcm.length, Endian.little);
+  final result = wav.buffer.asUint8List();
+  result.setRange(44, result.length, pcm);
+  return result;
 }
 
 void _writeAscii(ByteData data, int offset, String value) {

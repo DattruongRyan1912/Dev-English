@@ -5,13 +5,17 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
 const (
 	defaultConnectorPageSize = 100
 	maxConnectorPageSize     = 1000
+	githubRestartCursor      = "1"
 )
+
+var syncRunSequence uint64
 
 // DriveSyncRequest describes one bounded incremental page. Cursor tokens are
 // opaque and must only come from DriveReader or a previously committed state.
@@ -31,23 +35,44 @@ type DriveSyncState struct {
 	LastSynced  time.Time
 }
 
-func (s DriveSyncState) Validate() error {
-	if strings.TrimSpace(s.WorkspaceID) == "" {
-		return ErrInvalidWorkspaceID
-	}
-	if s.HasMore && !s.Cursor.Valid() {
-		return ErrInvalidCursor
-	}
-	return nil
+// DriveRevisionStore is the application-facing sink for normalized Drive
+// revisions. Implementations must enforce a unique revision key so a
+// concurrent or replayed page remains idempotent.
+type DriveRevisionStore interface {
+	HasRevision(ctx context.Context, revisionKey string) (bool, error)
+	PutRevision(ctx context.Context, item DriveSourceItem) error
+	SaveCursor(ctx context.Context, state DriveSyncState) error
 }
 
-// DriveRevisionStore is the application-facing sink for normalized Drive
-// revisions. Implementations must enforce a unique revision key within the
-// supplied workspace so a replayed page cannot suppress another workspace.
-type DriveRevisionStore interface {
-	HasRevision(ctx context.Context, workspaceID, revisionKey string) (bool, error)
-	PutRevision(ctx context.Context, workspaceID string, item DriveSourceItem) error
-	SaveCursor(ctx context.Context, state DriveSyncState) error
+// DriveRemovalStore is an optional but production-required capability for
+// changes-feed consumers. A provider removal must hide the source item from
+// retrieval while preserving its immutable revisions for audit/history.
+type DriveRemovalStore interface {
+	MarkRemoved(ctx context.Context, fileID string, removedAt time.Time) error
+}
+
+// DriveCursorReader is an optional capability for durable stores. When a
+// caller omits a cursor, the sync service can resume from the last committed
+// checkpoint instead of silently starting a second full page walk.
+type DriveCursorReader interface {
+	LoadCursor(ctx context.Context, workspaceID string) (DriveSyncState, bool, error)
+}
+
+// SyncRunSummary is the bounded, non-sensitive evidence recorded for one
+// connector page. It intentionally contains counts and status only, never
+// provider payloads or credentials.
+type SyncRunSummary struct {
+	Seen     int
+	Upserted int
+	Skipped  int
+}
+
+// SyncRunRecorder is an optional durable audit capability. A sync service
+// records a running row before provider I/O and closes it after the page has
+// either committed or failed.
+type SyncRunRecorder interface {
+	StartSyncRun(ctx context.Context, provider, workspaceID, target, cursorBefore string, startedAt time.Time) (string, error)
+	CompleteSyncRun(ctx context.Context, runID, status string, summary SyncRunSummary, cursorAfter, errorCode string, completedAt time.Time) error
 }
 
 // DriveSyncService coordinates read-only Drive pages and a revision sink.
@@ -68,20 +93,56 @@ func NewDriveSyncService(reader DriveReader, store DriveRevisionStore) (*DriveSy
 // Sync processes exactly one provider page. It intentionally does not loop
 // through all pages: callers can checkpoint and schedule each continuation
 // independently.
-func (s *DriveSyncService) Sync(ctx context.Context, request DriveSyncRequest) (DriveSyncResult, error) {
-	var result DriveSyncResult
-	if s == nil || s.Reader == nil || s.Store == nil {
-		return result, errors.New("drive sync reader and store are required")
+func (s *DriveSyncService) Sync(ctx context.Context, request DriveSyncRequest) (result DriveSyncResult, err error) {
+	if err := validateSyncRequest(request.WorkspaceID, request.Cursor.Token, request.PageSize); err != nil {
+		return result, err
 	}
 	workspaceID := strings.TrimSpace(request.WorkspaceID)
-	if err := validateSyncRequest(workspaceID, request.Cursor.Token, request.PageSize); err != nil {
-		return result, err
-	}
-	if err := ctx.Err(); err != nil {
-		return result, err
-	}
 	pageSize := normalizedPageSize(request.PageSize)
 	cursor := normalizedCursor(request.Cursor)
+	if cursor.Token == "" {
+		if reader, ok := s.Store.(DriveCursorReader); ok {
+			checkpoint, found, err := reader.LoadCursor(ctx, workspaceID)
+			if err != nil {
+				return result, wrapConnectorFailure(ProviderGoogleDrive, "load cursor", err)
+			}
+			if found {
+				if strings.TrimSpace(checkpoint.WorkspaceID) != workspaceID ||
+					(checkpoint.HasMore && !checkpoint.Cursor.Valid()) {
+					return result, ErrInvalidSyncState
+				}
+				cursor = normalizedCursor(checkpoint.Cursor)
+			}
+		}
+	}
+	clock := s.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	cursorAfter := cursor.Token
+	var runID string
+	var recorder SyncRunRecorder
+	if candidate, ok := s.Store.(SyncRunRecorder); ok {
+		recorder = candidate
+		runID, err = recorder.StartSyncRun(ctx, ProviderGoogleDrive, workspaceID, "", cursor.Token, clock().UTC())
+		if err != nil {
+			return result, wrapConnectorFailure(ProviderGoogleDrive, "start sync run", err)
+		}
+		defer func() {
+			status := "succeeded"
+			errorCode := ""
+			if err != nil {
+				status = "failed"
+				errorCode = syncRunErrorCode(err)
+			}
+			completeErr := recorder.CompleteSyncRun(ctx, runID, status, SyncRunSummary{
+				Seen: result.Seen, Upserted: result.Upserted, Skipped: result.Skipped,
+			}, cursorAfter, errorCode, clock().UTC())
+			if err == nil && completeErr != nil {
+				err = wrapConnectorFailure(ProviderGoogleDrive, "complete sync run", completeErr)
+			}
+		}()
+	}
 	page, err := s.Reader.List(ctx, DriveListRequest{
 		WorkspaceID: workspaceID,
 		Cursor:      cursor,
@@ -101,7 +162,18 @@ func (s *DriveSyncService) Sync(ctx context.Context, request DriveSyncRequest) (
 	}
 	result.Skipped = skipped
 	for _, item := range unique {
-		exists, existsErr := s.Store.HasRevision(ctx, workspaceID, item.RevisionKey())
+		if item.Removed {
+			removalStore, ok := s.Store.(DriveRemovalStore)
+			if !ok {
+				return result, ErrRemovalNotSupported
+			}
+			if removeErr := removalStore.MarkRemoved(ctx, strings.TrimSpace(item.FileID), clock().UTC()); removeErr != nil {
+				return result, wrapConnectorFailure(ProviderGoogleDrive, "mark removed", removeErr)
+			}
+			result.Upserted++
+			continue
+		}
+		exists, existsErr := s.Store.HasRevision(ctx, item.RevisionKey())
 		if existsErr != nil {
 			return result, wrapConnectorFailure(ProviderGoogleDrive, "check revision", existsErr)
 		}
@@ -109,7 +181,7 @@ func (s *DriveSyncService) Sync(ctx context.Context, request DriveSyncRequest) (
 			result.Skipped++
 			continue
 		}
-		if putErr := s.Store.PutRevision(ctx, workspaceID, item); putErr != nil {
+		if putErr := s.Store.PutRevision(ctx, item); putErr != nil {
 			if errors.Is(putErr, ErrRevisionAlreadyExists) {
 				result.Skipped++
 				continue
@@ -120,17 +192,18 @@ func (s *DriveSyncService) Sync(ctx context.Context, request DriveSyncRequest) (
 	}
 
 	result.HasMore = page.HasMore
+	checkpointCursor := normalizedCursor(page.NextCursor)
 	if page.HasMore {
-		result.NextCursor = normalizedCursor(page.NextCursor)
+		result.NextCursor = checkpointCursor
+	} else if page.CheckpointCursor.Valid() {
+		checkpointCursor = normalizedCursor(page.CheckpointCursor)
 	}
+	cursorAfter = checkpointCursor.Token
 	state := DriveSyncState{
 		WorkspaceID: workspaceID,
-		Cursor:      result.NextCursor,
+		Cursor:      checkpointCursor,
 		HasMore:     result.HasMore,
-		LastSynced:  syncNow(s.Clock),
-	}
-	if err := state.Validate(); err != nil {
-		return result, err
+		LastSynced:  clock().UTC(),
 	}
 	if saveErr := s.Store.SaveCursor(ctx, state); saveErr != nil {
 		return result, wrapConnectorFailure(ProviderGoogleDrive, "save cursor", saveErr)
@@ -187,13 +260,13 @@ func NewGitHubImportItem(issue GitHubIssue) (GitHubImportItem, error) {
 		return GitHubImportItem{}, err
 	}
 	return GitHubImportItem{
-		Repository: normalizeRepository(issue.Repository),
+		Repository: issue.Repository,
 		Kind:       "issue",
 		Number:     issue.Number,
 		Title:      issue.Title,
 		Body:       issue.Body,
 		State:      issue.State,
-		Revision:   strings.TrimSpace(issue.Revision),
+		Revision:   issue.Revision,
 		UpdatedAt:  issue.UpdatedAt,
 	}, nil
 }
@@ -227,23 +300,16 @@ type GitHubSyncState struct {
 	LastSynced  time.Time
 }
 
-func (s GitHubSyncState) Validate() error {
-	if strings.TrimSpace(s.WorkspaceID) == "" {
-		return ErrInvalidWorkspaceID
-	}
-	if normalizeRepository(s.Repository) == "" {
-		return ErrInvalidRepository
-	}
-	if s.HasMore && strings.TrimSpace(s.Cursor) == "" {
-		return ErrInvalidCursor
-	}
-	return nil
+type GitHubRevisionStore interface {
+	HasRevision(ctx context.Context, revisionKey string) (bool, error)
+	PutRevision(ctx context.Context, item GitHubImportItem) error
+	SaveCursor(ctx context.Context, state GitHubSyncState) error
 }
 
-type GitHubRevisionStore interface {
-	HasRevision(ctx context.Context, workspaceID, revisionKey string) (bool, error)
-	PutRevision(ctx context.Context, workspaceID string, item GitHubImportItem) error
-	SaveCursor(ctx context.Context, state GitHubSyncState) error
+// GitHubCursorReader is the repository capability used to resume a bounded
+// issue import when the request does not carry an explicit page cursor.
+type GitHubCursorReader interface {
+	LoadCursor(ctx context.Context, workspaceID, repository string) (GitHubSyncState, bool, error)
 }
 
 // GitHubImportService adapts the existing read-only issue client into an
@@ -261,25 +327,63 @@ func NewGitHubImportService(reader GitHubReadClient, store GitHubRevisionStore) 
 	return &GitHubImportService{Reader: reader, Store: store, Clock: time.Now}, nil
 }
 
-func (s *GitHubImportService) SyncIssues(ctx context.Context, request GitHubImportRequest) (GitHubImportResult, error) {
-	var result GitHubImportResult
-	if s == nil || s.Reader == nil || s.Store == nil {
-		return result, errors.New("GitHub import reader and store are required")
-	}
-	workspaceID := strings.TrimSpace(request.WorkspaceID)
-	if err := validateSyncRequest(workspaceID, request.Cursor, request.PageSize); err != nil {
+func (s *GitHubImportService) SyncIssues(ctx context.Context, request GitHubImportRequest) (result GitHubImportResult, err error) {
+	if err := validateSyncRequest(request.WorkspaceID, request.Cursor, request.PageSize); err != nil {
 		return result, err
 	}
+	workspaceID := strings.TrimSpace(request.WorkspaceID)
 	repository := normalizeRepository(request.Repository)
 	if repository == "" {
 		return result, ErrInvalidRepository
 	}
-	if err := ctx.Err(); err != nil {
-		return result, err
+	cursor := strings.TrimSpace(request.Cursor)
+	if cursor == "" {
+		if reader, ok := s.Store.(GitHubCursorReader); ok {
+			checkpoint, found, err := reader.LoadCursor(ctx, workspaceID, repository)
+			if err != nil {
+				return result, wrapConnectorFailure(ProviderGitHub, "load cursor", err)
+			}
+			if found {
+				if strings.TrimSpace(checkpoint.WorkspaceID) != workspaceID ||
+					normalizeRepository(checkpoint.Repository) != repository ||
+					(checkpoint.HasMore && strings.TrimSpace(checkpoint.Cursor) == "") {
+					return result, ErrInvalidSyncState
+				}
+				cursor = strings.TrimSpace(checkpoint.Cursor)
+			}
+		}
+	}
+	clock := s.Clock
+	if clock == nil {
+		clock = time.Now
+	}
+	cursorAfter := cursor
+	var runID string
+	var recorder SyncRunRecorder
+	if candidate, ok := s.Store.(SyncRunRecorder); ok {
+		recorder = candidate
+		runID, err = recorder.StartSyncRun(ctx, ProviderGitHub, workspaceID, repository, cursor, clock().UTC())
+		if err != nil {
+			return result, wrapConnectorFailure(ProviderGitHub, "start sync run", err)
+		}
+		defer func() {
+			status := "succeeded"
+			errorCode := ""
+			if err != nil {
+				status = "failed"
+				errorCode = syncRunErrorCode(err)
+			}
+			completeErr := recorder.CompleteSyncRun(ctx, runID, status, SyncRunSummary{
+				Seen: result.Seen, Upserted: result.Upserted, Skipped: result.Skipped,
+			}, cursorAfter, errorCode, clock().UTC())
+			if err == nil && completeErr != nil {
+				err = wrapConnectorFailure(ProviderGitHub, "complete sync run", completeErr)
+			}
+		}()
 	}
 	page, err := s.Reader.ListIssues(ctx, GitHubIssueListRequest{
-		Repository: repository,
-		Cursor:     strings.TrimSpace(request.Cursor),
+		Repository: request.Repository,
+		Cursor:     cursor,
 		PageSize:   normalizedPageSize(request.PageSize),
 	})
 	if err != nil {
@@ -304,7 +408,7 @@ func (s *GitHubImportService) SyncIssues(ctx context.Context, request GitHubImpo
 	}
 	result.Skipped = skipped
 	for _, item := range unique {
-		exists, existsErr := s.Store.HasRevision(ctx, workspaceID, item.RevisionKey())
+		exists, existsErr := s.Store.HasRevision(ctx, item.RevisionKey())
 		if existsErr != nil {
 			return result, wrapConnectorFailure(ProviderGitHub, "check revision", existsErr)
 		}
@@ -312,7 +416,7 @@ func (s *GitHubImportService) SyncIssues(ctx context.Context, request GitHubImpo
 			result.Skipped++
 			continue
 		}
-		if putErr := s.Store.PutRevision(ctx, workspaceID, item); putErr != nil {
+		if putErr := s.Store.PutRevision(ctx, item); putErr != nil {
 			if errors.Is(putErr, ErrRevisionAlreadyExists) {
 				result.Skipped++
 				continue
@@ -325,17 +429,21 @@ func (s *GitHubImportService) SyncIssues(ctx context.Context, request GitHubImpo
 	if page.HasMore {
 		result.NextCursor = strings.TrimSpace(page.NextCursor)
 	}
-	state := GitHubSyncState{
+	// GitHub's issues API is page-based and has no changes token. Once a full
+	// scan completes, persist an explicit page-one restart checkpoint rather
+	// than an empty cursor that hides the fact that the next run is a full
+	// rescan. This remains safe for updates that move or appear on page one.
+	cursorAfter = result.NextCursor
+	if !result.HasMore {
+		cursorAfter = githubRestartCursor
+	}
+	if saveErr := s.Store.SaveCursor(ctx, GitHubSyncState{
 		WorkspaceID: workspaceID,
 		Repository:  repository,
-		Cursor:      result.NextCursor,
+		Cursor:      cursorAfter,
 		HasMore:     result.HasMore,
-		LastSynced:  syncNow(s.Clock),
-	}
-	if err := state.Validate(); err != nil {
-		return result, err
-	}
-	if saveErr := s.Store.SaveCursor(ctx, state); saveErr != nil {
+		LastSynced:  clock().UTC(),
+	}); saveErr != nil {
 		return result, wrapConnectorFailure(ProviderGitHub, "save cursor", saveErr)
 	}
 	return result, nil
@@ -344,17 +452,10 @@ func (s *GitHubImportService) SyncIssues(ctx context.Context, request GitHubImpo
 // GetIssue is a read-only import operation for detail views and manual
 // ingestion. It uses the same normalization and revision validation as sync.
 func (s *GitHubImportService) GetIssue(ctx context.Context, repository string, number int64) (GitHubImportItem, error) {
-	if s == nil || s.Reader == nil {
-		return GitHubImportItem{}, errors.New("GitHub import reader is required")
-	}
-	normalizedRepository := normalizeRepository(repository)
-	if normalizedRepository == "" || number < 1 {
+	if normalizeRepository(repository) == "" || number < 1 {
 		return GitHubImportItem{}, ErrInvalidRepository
 	}
-	if err := ctx.Err(); err != nil {
-		return GitHubImportItem{}, err
-	}
-	issue, err := s.Reader.GetIssue(ctx, normalizedRepository, number)
+	issue, err := s.Reader.GetIssue(ctx, repository, number)
 	if err != nil {
 		return GitHubImportItem{}, wrapConnectorFailure(ProviderGitHub, "get issue", err)
 	}
@@ -400,16 +501,24 @@ func validateSyncRequest(workspaceID, cursor string, pageSize int) error {
 	return nil
 }
 
-func scopedRevisionKey(workspaceID, revisionKey string) (string, error) {
-	workspace := strings.TrimSpace(workspaceID)
-	key := strings.TrimSpace(revisionKey)
-	if workspace == "" {
-		return "", ErrInvalidWorkspaceID
+func syncRunErrorCode(err error) string {
+	switch {
+	case errors.Is(err, ErrInvalidCursor):
+		return "invalid_cursor"
+	case errors.Is(err, ErrInvalidSyncState):
+		return "invalid_sync_state"
+	case errors.Is(err, ErrInvalidRevisionIdentity):
+		return "invalid_revision"
+	case errors.Is(err, ErrRevisionAlreadyExists):
+		return "duplicate_revision"
+	default:
+		return "sync_failed"
 	}
-	if key == "" {
-		return "", ErrInvalidRevisionIdentity
-	}
-	return workspace + "\x00" + key, nil
+}
+
+func newSyncRunID(provider, workspaceID, target string, startedAt time.Time) string {
+	sequence := atomic.AddUint64(&syncRunSequence, 1)
+	return stableConnectorID("sync-run", fmt.Sprintf("%s:%s:%s:%d:%d", provider, workspaceID, target, startedAt.UnixNano(), sequence))
 }
 
 func normalizedPageSize(pageSize int) int {
@@ -432,21 +541,22 @@ func normalizeRepository(repository string) string {
 	return value
 }
 
-func syncNow(clock func() time.Time) time.Time {
-	if clock == nil {
-		clock = time.Now
-	}
-	return clock().UTC()
-}
-
 // wrapConnectorFailure preserves errors.Is/errors.As while ensuring an
 // arbitrary provider error cannot leak a token or response body.
 func wrapConnectorFailure(provider, operation string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return &redactedError{
-		message: fmt.Sprintf("%s %s: %s", RedactSecrets(provider), RedactSecrets(operation), RedactSecrets(err.Error())),
+	return &redactedWrappedError{
+		message: fmt.Sprintf("%s %s: %s", provider, operation, RedactSecrets(err.Error())),
 		cause:   err,
 	}
 }
+
+type redactedWrappedError struct {
+	message string
+	cause   error
+}
+
+func (e *redactedWrappedError) Error() string { return e.message }
+func (e *redactedWrappedError) Unwrap() error { return e.cause }

@@ -7,6 +7,8 @@ This folder is the working record for project scope, delivery status, decisions 
 - [`REQUIREMENTS.md`](REQUIREMENTS.md) — product goals and agreed V1 requirements.
 - [`STATUS.md`](STATUS.md) — current implementation state, priorities and blockers.
 - [`ROADMAP.md`](ROADMAP.md) — delivery phases and remaining work.
+- [`REBUILD_PLAN.md`](REBUILD_PLAN.md) — source-verified product reset, end-to-end delivery and full UI rebuild plan.
+- [`MCP_CLIENT_SETUP.md`](MCP_CLIENT_SETUP.md) — product MCP handoff for Codex/Claude, token scopes and operator acceptance.
 - [`DECISIONS.md`](DECISIONS.md) — dated technical and product decisions.
 - [`TEST_LOG.md`](TEST_LOG.md) — commands, smoke checks and manual-test results.
 
@@ -24,4 +26,3 @@ This folder is the working record for project scope, delivery status, decisions 
 - Go backend: `http://localhost:8080`
 - PostgreSQL/pgvector: `localhost:5433`
 - Provider configuration: ignored `.env.local`
-

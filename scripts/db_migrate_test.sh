@@ -28,9 +28,47 @@ run_migrate() {
     POSTGRES_SERVICE="$postgres_service" \
     POSTGRES_USER="$postgres_user" \
     POSTGRES_DB="$postgres_db" \
+    DRY_RUN="${DRY_RUN:-NO}" \
     MIGRATIONS_DIR="$1" \
     "$repo_root/scripts/db_migrate.sh"
 }
+
+set +e
+invalid_dry_run_output="$({
+  DRY_RUN=maybe \
+    COMPOSE_FILE="$compose_file" \
+    ENV_FILE="$env_file" \
+    POSTGRES_SERVICE="$postgres_service" \
+    POSTGRES_USER="$postgres_user" \
+    POSTGRES_DB="$postgres_db" \
+    MIGRATIONS_DIR="$migrations_dir" \
+    "$repo_root/scripts/db_migrate.sh"
+} 2>&1)"
+invalid_dry_run_status=$?
+set -e
+if (( invalid_dry_run_status != 2 )) || ! grep -Fq 'DRY_RUN must be YES or NO.' <<<"$invalid_dry_run_output"; then
+  printf 'Invalid DRY_RUN did not fail closed before migration execution.\n' >&2
+  exit 1
+fi
+
+dry_run_output="$(DRY_RUN=YES run_migrate "$migrations_dir")"
+printf '%s\n' "$dry_run_output"
+if ! grep -Fq 'Migration dry-run' <<<"$dry_run_output"; then
+  printf 'Dry-run did not emit its report header.\n' >&2
+  exit 1
+fi
+for migration in "${migrations_dir}"/*.sql; do
+  version="$(basename "$migration")"
+  if ! grep -Fq "pending $version" <<<"$dry_run_output"; then
+    printf 'Dry-run did not report %s as pending on a fresh database.\n' "$version" >&2
+    exit 1
+  fi
+done
+schema_table_after_dry_run="$(psql_exec -Atqc "SELECT to_regclass('public.schema_migrations')")"
+if [[ -n "$schema_table_after_dry_run" ]]; then
+  printf 'Dry-run changed the database by creating schema_migrations.\n' >&2
+  exit 1
+fi
 
 first_output="$(run_migrate "$migrations_dir")"
 printf '%s\n' "$first_output"

@@ -24,14 +24,33 @@ services:
       - ../.env.local
     environment:
       PORT: "8080"
+      DEVENGLISH_MODULES: ${DEVENGLISH_MODULES:-all}
       DATABASE_URL: postgres://devenglish:devenglish-local-only@postgres:5432/devenglish?sslmode=disable
       DEVENGLISH_SECRET_ENCRYPTION_KEY: ${DEVENGLISH_SECRET_ENCRYPTION_KEY:-}
+      EMBEDDING_SIDECAR_URL: http://embedding:8090
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
     depends_on:
       postgres:
+        condition: service_healthy
+      embedding:
         condition: service_healthy
     ports:
       - "8080:8080"
     restart: unless-stopped
 
+  embedding:
+    build:
+      context: ./embedding
+      dockerfile: Dockerfile
+    environment:
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
+    volumes:
+      - devenglish-embedding-models:/models
+    ports:
+      - "8090:8090"
+    restart: unless-stopped
+
 volumes:
   devenglish-postgres:
+  devenglish-embedding-models:

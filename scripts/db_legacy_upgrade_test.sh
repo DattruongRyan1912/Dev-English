@@ -73,12 +73,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-env_file="$(mktemp)"
+env_file=""
 temp_root="$(mktemp -d)"
-rm -f -- "$env_file"
+env_file="$temp_root/empty.env"
+: > "$env_file"
+migrations_dir="$temp_root/migrations"
 phase1_dir="$temp_root/phase1"
+legacy_catalog_dir="$temp_root/legacy-catalog"
 phase2_dir="$temp_root/phase2"
-mkdir -p "$phase1_dir" "$phase2_dir"
+mkdir -p "$migrations_dir" "$phase1_dir" "$legacy_catalog_dir" "$phase2_dir"
 
 link_migration() {
   migration_name="$1"
@@ -97,11 +100,31 @@ for migration_name in \
   002_provider_secrets.sql; do
   link_migration "$migration_name" "$phase1_dir"
 done
+
 for migration_name in \
   003_platform_foundation.sql \
   004_platform_safety.sql \
   005_knowledge.sql \
   006_work.sql; do
+  link_migration "$migration_name" "$legacy_catalog_dir"
+done
+
+# Commit 104304f shipped the catalog through migration 006. Apply that exact
+# legacy catalog first, then exercise the upgrade path for the newer modules.
+for migration_name in \
+  007_assistant_s1.sql \
+  008_knowledge_root_fks.sql \
+  009_knowledge_evidence_trigger_repair.sql \
+  010_connector_sync.sql \
+  011_usage_accounting.sql \
+  012_action_receipt_hash.sql \
+  013_learning_overlay.sql \
+  014_workspace_backfill.sql \
+  015_usage_reservations.sql \
+  016_mcp_tokens.sql \
+  017_workspace_scoped_challenge_identity.sql \
+  018_assistant_conversation_context.sql \
+  019_platform_constraint_repair.sql; do
   link_migration "$migration_name" "$phase2_dir"
 done
 
@@ -132,9 +155,8 @@ run_migrate() {
 }
 
 require_output() {
-  local output="$1"
-  local expected_line="$2"
-  local line
+  output="$1"
+  expected_line="$2"
   while IFS= read -r line; do
     if [[ "$line" == "$expected_line" ]]; then
       return 0
@@ -145,7 +167,6 @@ require_output() {
 }
 
 require_blank_database() {
-  local relation_count
   relation_count="$(psql_exec -Atqc "
     SELECT count(*)
     FROM pg_class AS relation
@@ -154,31 +175,30 @@ require_blank_database() {
       AND namespace.nspname <> 'information_schema'
       AND relation.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')")"
   if [[ "$relation_count" != "0" ]]; then
-    printf 'Disposable database must be blank before migration or seed; found %s user relations.\n' \
-      "$relation_count" >&2
+    printf 'Disposable database must be blank before migration or seed; found %s user relations.\n' "$relation_count" >&2
     return 1
   fi
 }
 
 legacy_snapshot() {
   psql_query "
-      SELECT 'imported_sources|' || count(*)::text || '|' ||
-             md5(coalesce(string_agg(
-               format('%s|%s|%s|%s|%s|%s', id, user_id, source_type, title, content,
-                 to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')),
-               '' ORDER BY id), ''))
-      FROM imported_sources
-      WHERE user_id IN (:'user_a', :'user_b')
-      UNION ALL
-      SELECT 'work_context|' || count(*)::text || '|' ||
-             md5(coalesce(string_agg(
-               format('%s|%s|%s|%s|%s|%s|%s|%s', id, user_id, source_type, source_url,
-                 title, content, domain,
-                 to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')),
-               '' ORDER BY id), ''))
-      FROM work_context
-      WHERE user_id IN (:'user_a', :'user_b')
-      ORDER BY 1" \
+    SELECT 'imported_sources|' || count(*)::text || '|' ||
+           md5(coalesce(string_agg(
+             format('%s|%s|%s|%s|%s|%s', id, user_id, source_type, title, content,
+               to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')),
+             '' ORDER BY id), ''))
+    FROM imported_sources
+    WHERE user_id IN (:'user_a', :'user_b')
+    UNION ALL
+    SELECT 'work_context|' || count(*)::text || '|' ||
+           md5(coalesce(string_agg(
+             format('%s|%s|%s|%s|%s|%s|%s|%s', id, user_id, source_type, source_url,
+               title, content, domain,
+               to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US')),
+             '' ORDER BY id), ''))
+    FROM work_context
+    WHERE user_id IN (:'user_a', :'user_b')
+    ORDER BY 1" \
     --set=user_a="$user_a" \
     --set=user_b="$user_b"
 }
@@ -262,60 +282,95 @@ SQL
 before_snapshot="$(legacy_snapshot)"
 printf 'Legacy snapshot before upgrade: %s\n' "$before_snapshot"
 
-printf 'Running Phase 2 migrations 003..006.\n'
+printf 'Running legacy catalog migrations 003..006 from 104304f.\n'
+legacy_catalog_output="$(run_migrate "$legacy_catalog_dir")"
+printf '%s\n' "$legacy_catalog_output"
+for migration_name in \
+  003_platform_foundation.sql \
+  004_platform_safety.sql \
+  005_knowledge.sql \
+  006_work.sql; do
+  require_output "$legacy_catalog_output" "applied $migration_name"
+done
+
+printf 'Running upgrade migrations 007..019.\n'
 phase2_output="$(run_migrate "$phase2_dir")"
 printf '%s\n' "$phase2_output"
 for migration_name in \
-  003_platform_foundation.sql \
-  004_platform_safety.sql \
-  005_knowledge.sql \
-  006_work.sql; do
+  007_assistant_s1.sql \
+  008_knowledge_root_fks.sql \
+  009_knowledge_evidence_trigger_repair.sql \
+  010_connector_sync.sql \
+  011_usage_accounting.sql \
+  012_action_receipt_hash.sql \
+  013_learning_overlay.sql \
+  014_workspace_backfill.sql \
+  015_usage_reservations.sql \
+  016_mcp_tokens.sql \
+  017_workspace_scoped_challenge_identity.sql \
+  018_assistant_conversation_context.sql \
+  019_platform_constraint_repair.sql; do
   require_output "$phase2_output" "applied $migration_name"
 done
 
-printf 'Checking Phase 2 idempotency.\n'
+printf 'Checking full migration idempotency.\n'
 phase2_second_output="$(run_migrate "$phase2_dir")"
 printf '%s\n' "$phase2_second_output"
 for migration_name in \
-  003_platform_foundation.sql \
-  004_platform_safety.sql \
-  005_knowledge.sql \
-  006_work.sql; do
+  007_assistant_s1.sql \
+  008_knowledge_root_fks.sql \
+  009_knowledge_evidence_trigger_repair.sql \
+  010_connector_sync.sql \
+  011_usage_accounting.sql \
+  012_action_receipt_hash.sql \
+  013_learning_overlay.sql \
+  014_workspace_backfill.sql \
+  015_usage_reservations.sql \
+  016_mcp_tokens.sql \
+  017_workspace_scoped_challenge_identity.sql \
+  018_assistant_conversation_context.sql \
+  019_platform_constraint_repair.sql; do
   require_output "$phase2_second_output" "already applied $migration_name"
 done
-
-workspace_a1='legacy-upgrade-workspace-a1'
-workspace_a2='legacy-upgrade-workspace-a2'
-printf 'Creating the ambiguous topology fixture without mapping legacy rows.\n'
-psql_exec \
-  --set=user_a="$user_a" \
-  --set=workspace_a1="$workspace_a1" \
-  --set=workspace_a2="$workspace_a2" \
-  --single-transaction <<'SQL'
-INSERT INTO workspaces (id, owner_user_id, name, slug, description)
-VALUES
-  (:'workspace_a1', :'user_a', 'Legacy upgrade workspace A1', 'legacy-upgrade-a1', 'synthetic ambiguity fixture'),
-  (:'workspace_a2', :'user_a', 'Legacy upgrade workspace A2', 'legacy-upgrade-a2', 'synthetic ambiguity fixture');
-SQL
 
 after_snapshot="$(legacy_snapshot)"
 printf 'Legacy snapshot after upgrade: %s\n' "$after_snapshot"
 if [[ "$after_snapshot" != "$before_snapshot" ]]; then
-  printf 'Legacy snapshot changed across migrations 003..006.\n' >&2
+  printf 'Legacy snapshot changed across migrations 003..019.\n' >&2
   exit 1
 fi
 
 schema_versions="$(psql_exec -Atqc "SELECT string_agg(version, ',' ORDER BY version) FROM schema_migrations")"
-expected_schema_versions='000_schema_migrations.sql,001_initial.sql,002_provider_secrets.sql,003_platform_foundation.sql,004_platform_safety.sql,005_knowledge.sql,006_work.sql'
+expected_schema_versions='000_schema_migrations.sql,001_initial.sql,002_provider_secrets.sql,003_platform_foundation.sql,004_platform_safety.sql,005_knowledge.sql,006_work.sql,007_assistant_s1.sql,008_knowledge_root_fks.sql,009_knowledge_evidence_trigger_repair.sql,010_connector_sync.sql,011_usage_accounting.sql,012_action_receipt_hash.sql,013_learning_overlay.sql,014_workspace_backfill.sql,015_usage_reservations.sql,016_mcp_tokens.sql,017_workspace_scoped_challenge_identity.sql,018_assistant_conversation_context.sql,019_platform_constraint_repair.sql'
 if [[ "$schema_versions" != "$expected_schema_versions" ]]; then
   printf 'Unexpected schema_migrations contents: %s\n' "$schema_versions" >&2
   exit 1
 fi
 
-assert_true 'user A owns exactly two active workspaces' "$(psql_query "SELECT count(*) = 2 FROM workspaces WHERE owner_user_id = :'user_a' AND deleted_at IS NULL" --set=user_a="$user_a")"
-assert_true 'user B owns zero active workspaces' "$(psql_query "SELECT count(*) = 0 FROM workspaces WHERE owner_user_id = :'user_b' AND deleted_at IS NULL" --set=user_b="$user_b")"
+assert_true 'user A receives one deterministic default workspace' "$(psql_query "SELECT count(*) = 1 FROM workspaces WHERE owner_user_id = :'user_a' AND deleted_at IS NULL" --set=user_a="$user_a")"
+assert_true 'user B receives one deterministic default workspace' "$(psql_query "SELECT count(*) = 1 FROM workspaces WHERE owner_user_id = :'user_b' AND deleted_at IS NULL" --set=user_b="$user_b")"
+assert_true 'workspace backfill preserves migration metadata' "$(psql_exec -Atqc "SELECT count(*) = 2 FROM workspaces WHERE (metadata ->> 'migration') = '014_workspace_backfill' AND (metadata ->> 'legacyPreserved') = 'true'")"
 assert_true 'legacy work_context remains one row per user' "$(psql_query "SELECT (SELECT count(*) FROM work_context WHERE user_id = :'user_a') = 1 AND (SELECT count(*) FROM work_context WHERE user_id = :'user_b') = 1" --set=user_a="$user_a" --set=user_b="$user_b")"
 assert_true 'legacy imported_sources remains one row per user' "$(psql_query "SELECT (SELECT count(*) FROM imported_sources WHERE user_id = :'user_a') = 1 AND (SELECT count(*) FROM imported_sources WHERE user_id = :'user_b') = 1" --set=user_a="$user_a" --set=user_b="$user_b")"
 assert_true 'no canonical Knowledge rows were implicitly created' "$(psql_exec -Atqc 'SELECT (SELECT count(*) FROM knowledge_sources) = 0 AND (SELECT count(*) FROM source_items) = 0 AND (SELECT count(*) FROM source_revisions) = 0')"
+challenge_index_schema="$(psql_exec -Atq <<'SQL'
+SELECT count(*) FILTER (WHERE indexname = 'action_challenges_pending_workspace_hash_uidx') = 1
+  AND count(*) FILTER (WHERE indexname = 'action_challenges_pending_hash_uidx') = 0
+FROM pg_indexes
+WHERE schemaname = 'public'
+  AND tablename = 'action_challenges'
+  AND indexname LIKE 'action_challenges_pending%';
+SQL
+)"
+assert_true 'one canonical pending challenge index survives the legacy upgrade' "$challenge_index_schema"
+assistant_context_schema="$(psql_exec -Atq <<'SQL'
+  SELECT
+    EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'assistant_conversations' AND column_name = 'context_type')
+    AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'assistant_conversations' AND column_name = 'context_id')
+    AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'assistant_conversations_context_ref_ck' AND conrelid = 'assistant_conversations'::regclass)
+    AND to_regclass('public.assistant_conversations_context_scope_idx') IS NOT NULL;
+SQL
+)"
+assert_true 'assistant context columns and constraint are present' "$assistant_context_schema"
 
-printf 'Legacy schema upgrade preservation and isolation checks passed.\n'
+printf 'Legacy schema upgrade, workspace backfill, preservation and isolation checks passed.\n'

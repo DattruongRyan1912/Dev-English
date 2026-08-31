@@ -1,0 +1,13 @@
+{
+  "schema": "devenglish-wip-preservation@1",
+  "sourceBackup": "/Users/ryantruong/.agents/backups/20260825T151527Z-dev-english-cyberos-only/application-wip.sha256",
+  "purpose": "Explicitly record final-v1 integration repairs that intentionally changed a pre-existing WIP file after the original preservation snapshot.",
+  "entries": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "expectedSha256": "95e0c5ec2ccd0ccbbb00c4194698c00fc1febe41f612ca55207008d190f2cb7c",
+      "actualSha256": "099557ab68f389d582abc012bcd196dcb780efd1766c42e70bb7a204c65c3858",
+      "reason": "Restore the artifact-security, database race, and disposable backup/restore CI gates required by the final-v1 review."
+    }
+  ]
+}

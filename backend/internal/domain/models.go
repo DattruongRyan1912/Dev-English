@@ -299,23 +299,25 @@ type PronunciationScore struct {
 }
 
 type UsageRecord struct {
-	Provider      string    `json:"provider"`
-	Model         string    `json:"model"`
-	Feature       string    `json:"feature"`
-	InputTokens   int       `json:"inputTokens"`
-	OutputTokens  int       `json:"outputTokens"`
-	AudioSeconds  float64   `json:"audioSeconds"`
-	TTSCharacters int       `json:"ttsCharacters"`
-	EstimatedCost float64   `json:"estimatedCost"`
-	CreatedAt     time.Time `json:"createdAt"`
+	Provider       string    `json:"provider"`
+	Model          string    `json:"model"`
+	Feature        string    `json:"feature"`
+	InputTokens    int       `json:"inputTokens"`
+	OutputTokens   int       `json:"outputTokens"`
+	UsageAvailable bool      `json:"usageAvailable,omitempty"`
+	AudioSeconds   float64   `json:"audioSeconds"`
+	TTSCharacters  int       `json:"ttsCharacters"`
+	EstimatedCost  float64   `json:"estimatedCost"`
+	CreatedAt      time.Time `json:"createdAt"`
 }
 
 type UsageSummary struct {
-	Month             string        `json:"month"`
-	EstimatedCost     float64       `json:"estimatedCost"`
-	BudgetVND         int           `json:"budgetVnd"`
-	BudgetUsedPercent float64       `json:"budgetUsedPercent"`
-	Records           []UsageRecord `json:"records"`
+	Month              string        `json:"month"`
+	EstimatedCost      float64       `json:"estimatedCost"`
+	BudgetVND          int           `json:"budgetVnd"`
+	BudgetUsedPercent  float64       `json:"budgetUsedPercent"`
+	UnavailableRecords int           `json:"unavailableRecords"`
+	Records            []UsageRecord `json:"records"`
 }
 
 type VocabularyGraph struct {

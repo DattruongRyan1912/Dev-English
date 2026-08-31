@@ -322,7 +322,7 @@ func TestApplicationHTTPBindsIdentityAndReturnsStructuredAssistantResponse(t *te
 	handler := NewHandler(registry, store)
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"assistant.ask","arguments":{"conversationId":"conversation-1","message":"help me"}}}`
 	request := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
-	request.Header.Set(AuthorizationHeader, "Bearer "+token)
+	setMCPRequestHeaders(request, token)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {
@@ -386,7 +386,7 @@ func TestApplicationRejectsInvalidArgumentsAndMissingIdentityBeforeServices(t *t
 	}
 	trailingToken := mustReveal(t, &trailingIssued)
 	trailing := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"} {}`))
-	trailing.Header.Set(AuthorizationHeader, "Bearer "+trailingToken)
+	setMCPRequestHeaders(trailing, trailingToken)
 	trailingRecorder := httptest.NewRecorder()
 	NewHandler(registry, trailingStore).ServeHTTP(trailingRecorder, trailing)
 	if trailingRecorder.Code != http.StatusBadRequest {
@@ -698,7 +698,7 @@ func applicationHTTPCall(t *testing.T, handler *Handler, token string, requestID
 	t.Helper()
 	body := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":%q,"params":%s}`, requestID, method, params)
 	request := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
-	request.Header.Set(AuthorizationHeader, "Bearer "+token)
+	setMCPRequestHeaders(request, token)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	if recorder.Code != http.StatusOK {

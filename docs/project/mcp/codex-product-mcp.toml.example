@@ -1,0 +1,26 @@
+# Copy this table into the user-level ~/.codex/config.toml, or merge it into a
+# trusted product-client profile. Do not replace the repository's CyberOS MCP
+# entry in .codex/config.toml.
+#
+# Export DEVENGLISH_MCP_TOKEN in the environment visible to Codex before
+# starting the client. The token is intentionally not stored in this file.
+
+[mcp_servers.devenglish]
+# Same Mac as the local Docker backend. Replace with the HTTPS /mcp origin for
+# a remote phone, another machine, or a production-shaped environment.
+url = "http://127.0.0.1:8080/mcp"
+bearer_token_env_var = "DEVENGLISH_MCP_TOKEN"
+enabled = true
+
+# Read-only allowlist for the first client connection.
+enabled_tools = [
+  "assistant_ask",
+  "knowledge_search",
+  "knowledge_get",
+  "project_list",
+  "task_list",
+  "decision_get",
+]
+default_tools_approval_mode = "prompt"
+startup_timeout_sec = 10
+tool_timeout_sec = 60

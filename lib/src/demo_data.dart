@@ -216,6 +216,7 @@ class DemoData {
     estimatedCost: 0,
     budgetVnd: 300000,
     budgetUsedPercent: 0,
+    unavailableRecords: 0,
   );
 
   static const SettingsData settings = SettingsData(

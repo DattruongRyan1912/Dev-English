@@ -17,6 +17,7 @@ var (
 	ErrDuplicateEvidence      = errors.New("knowledge claim contains duplicate evidence")
 	ErrConflict               = errors.New("knowledge resource already exists")
 	ErrNotFound               = errors.New("knowledge resource was not found")
+	ErrUnsupportedRead        = errors.New("knowledge read capability is not configured")
 )
 
 // ValidationError identifies the first deterministic field-level validation

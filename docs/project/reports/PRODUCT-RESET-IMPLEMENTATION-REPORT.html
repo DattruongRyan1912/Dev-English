@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DevEnglish V1 Product Reset — Implementation Evidence</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101114;
+      --surface: #191b20;
+      --surface-2: #22252c;
+      --text: #f3f4f6;
+      --muted: #adb3bf;
+      --line: #363a44;
+      --accent: #8cc8ff;
+      --ok: #77e0a2;
+      --warn: #ffd580;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.55 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { width: min(1120px, calc(100% - 32px)); margin: 0 auto; padding: 48px 0 80px; }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { max-width: 820px; font-size: clamp(2rem, 5vw, 4rem); margin: 0 0 16px; }
+    h2 { margin-top: 48px; font-size: 1.65rem; }
+    h3 { margin-top: 28px; font-size: 1.1rem; }
+    p, li { color: var(--muted); }
+    code { color: var(--accent); background: #0b0c0f; padding: 2px 6px; border-radius: 5px; }
+    .lede { max-width: 820px; font-size: 1.12rem; }
+    .notice {
+      border: 1px solid #66552e;
+      background: #2d2616;
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin: 28px 0;
+    }
+    .notice p { color: var(--warn); margin: 0; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+    .card strong { display: block; color: var(--text); margin-bottom: 6px; }
+    .status { color: var(--ok); font-weight: 700; }
+    .status.warn { color: var(--warn); }
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+    table { width: 100%; border-collapse: collapse; min-width: 720px; background: var(--surface); }
+    th, td { padding: 13px 15px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--text); background: var(--surface-2); }
+    tr:last-child td { border-bottom: 0; }
+    .screens { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+    figure { margin: 0; }
+    figure img { display: block; width: 100%; aspect-ratio: 9 / 19.5; object-fit: cover; object-position: top; border: 1px solid var(--line); border-radius: 14px; background: #fff; }
+    figcaption { color: var(--muted); font-size: .88rem; margin-top: 8px; }
+    .checks { columns: 2; column-gap: 36px; }
+    .checks li { break-inside: avoid; margin-bottom: 8px; }
+    footer { border-top: 1px solid var(--line); margin-top: 56px; padding-top: 18px; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 800px) {
+      main { width: min(100% - 24px, 680px); padding-top: 28px; }
+      .grid, .screens { grid-template-columns: repeat(2, 1fr); }
+      .checks { columns: 1; }
+    }
+    @media (max-width: 480px) {
+      .grid, .screens { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <p>DevEnglish V1 · Product reset · 2026-08-29</p>
+    <h1>Implementation evidence for the new work assistant</h1>
+    <p class="lede">The canonical implementation now connects the workflow from work capture to sourced knowledge, grounded assistant answers, safe action receipts and an English learning overlay. Assistant conversations can also stay pinned to the exact canonical work or source record being discussed.</p>
+
+    <div class="notice">
+      <p><strong>Release boundary:</strong> local implementation evidence is substantially complete through S7. The raw 90% gate for the seven V1 core backend packages passes on a PostgreSQL-enabled profile, and the current overall profile is above the recorded R0 baseline. This report is not a release approval: the real-device/operator U0 verdict, lifecycle acceptance, current independent review and human authorization for Git operations remain open.</p>
+    </div>
+
+    <h2>What is implemented</h2>
+    <div class="grid">
+      <div class="card"><strong>Today</strong><span>Priority briefing, next action, work-derived mission and text-first assistant entry.</span></div>
+      <div class="card"><strong>Work</strong><span>Workspace-scoped Project, Task and Decision records with versions, detail views, activity history and trash/restore.</span></div>
+      <div class="card"><strong>Knowledge</strong><span>Immutable source revisions, evidence-linked claims, exact search and optional hybrid retrieval with connector tombstones.</span></div>
+      <div class="card"><strong>Assistant</strong><span>Grounded/inferred/unknown response contract, citations, provider routing, usage guard and pinned canonical context.</span></div>
+      <div class="card"><strong>Safe actions</strong><span>Preview, durable pending reservation, one-time challenge, idempotency and receipt for the limited GitHub write surface.</span></div>
+      <div class="card"><strong>Learning overlay</strong><span>Vietnamese help, usable English starters, editable transcript and opt-in speech paths.</span></div>
+    </div>
+
+    <h2>Slice evidence</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Slice</th><th>Result</th><th>Evidence and remaining boundary</th></tr></thead>
+        <tbody>
+          <tr><td>R0</td><td class="status warn">Baseline recorded; gate open</td><td>UX audit, flows, tokens, high-fidelity specification and prototype exist. Coverage baseline is recorded; operator/device verdict is still required.</td></tr>
+          <tr><td>S1</td><td class="status">Verified</td><td><code>/api/v2/bootstrap</code>, canonical Flutter Workspace shell and API/domain/controller contracts.</td></tr>
+          <tr><td>S2</td><td class="status">Implemented and tested</td><td>Project/Task/Decision CRUD, optimistic conflict, history, trash/restore/purge and Today next-action path.</td></tr>
+          <tr><td>S3</td><td class="status">Implemented and tested</td><td>Knowledge source/revision/chunk/claim/evidence, FTS, multilingual-e5-small sidecar/RRF and Drive/GitHub incremental read sync.</td></tr>
+          <tr><td>S4</td><td class="status">Implemented and tested</td><td>DeepSeek routing, grounded response normalization, usage reservation, transient retry, challenges, receipts and context-pinned conversations.</td></tr>
+          <tr><td>S5</td><td class="status">Implemented and tested</td><td>Work-derived learning overlay, isolated observations, editable transcript and on-demand TTS contracts. Full replacement/device UX remains open.</td></tr>
+          <tr><td>S6</td><td class="status">Implemented and tested</td><td>Streamable HTTP <code>/mcp</code> with required JSON/SSE negotiation, optional protocol-version validation, separate bearer token/scopes, tools/resources, replay and REST parity checks. Official MCP Go SDK conformance passes. Product-client handoff is documented in <code>docs/project/MCP_CLIENT_SETUP.md</code>; operator-side Codex/Claude configuration remains open.</td></tr>
+          <tr><td>S7</td><td class="status warn">Local evidence complete; gate open</td><td>Backfill/rollback, Docker migration/capacity harnesses, production-shaped smoke, responsive/state goldens and local builds passed. Release acceptance is not granted.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Latest continuation — strict backend coverage gate</h2>
+    <p>The current source gate refresh on 2026-08-30 passed the default Go normal/race suites (<code>985</code> tests each), PostgreSQL-enabled normal/race suites (<code>1060</code> tests each), <code>go vet</code>, <code>go build</code>, Flutter analyze, Flutter tests (<code>63</code> passed and <code>2</code> environment skips), the production-shell test in production mode, web release build and Android debug build. The PostgreSQL profile remains <code>77.40%</code> (<code>9354/12085</code>) and the raw package gate passes all seven V1 core packages. The production-shaped Docker smoke also passed from the current source; its isolated stack was removed after the run.</p>
+    <p>Evidence record: <code>docs/project/agent-runs/2026-08-30-current-source-gates.md</code>. This is local implementation evidence only; operator/device acceptance, CI delivery-commit evidence, independent review, provider/billing reconciliation and human release authorization remain open.</p>
+    <p>The latest UI correction keeps Today Settings in the compact mobile header while leaving Work and Knowledge multi-action controls below their headings. Workspace UI tests passed (<code>19</code>), the focused surface/state golden run passed (<code>32</code>), and push-to-talk now has keyboard focus plus Space/Enter press/release support. The rebuilt Tailscale-configured release APK passed emulator smoke on <code>emulator-5554</code>. Evidence is retained at <code>/var/folders/wd/txjr4_k51yj009f68scyqyz00000gn/T/devenglish-android-smoke.Saifwv</code>; this does not replace the real-device U0 verdict.</p>
+    <p>The repository now contains <code>scripts/backend_coverage_gate.mjs</code>, a deterministic checker for Go coverprofiles. It aggregates raw statement counts by backend-relative package and uses the integer comparison <code>covered × 100 &gt;= total × threshold</code>, so a rounded <code>90.00%</code> cannot hide a failing raw ratio. With <code>--baseline-manifest</code> it also enforces the overall R0 floor. The gate is wired into <code>.github/workflows/postgres-integrations.yml</code> after disposable PostgreSQL setup and uploads the profile as a CI artifact.</p>
+    <p>The latest local profile contains <code>9354/12085</code> statements (<code>77.40%</code>). Application is <code>752/830</code>, Assistant <code>274/295</code>, Connectors <code>1133/1258</code>, HTTP API <code>1169/1297</code>, Knowledge <code>833/923</code>, MCP <code>1358/1495</code> and Work <code>1581/1756</code>; the raw package gate exits <code>0</code>. The detached R0 baseline is <code>4269/6393 = 66.78%</code>, so the current overall profile is above the recorded floor.</p>
+    <p>Evidence records: <code>docs/project/agent-runs/2026-08-29-acceptance-audit.md</code>, <code>docs/project/agent-runs/2026-08-29-r0-baseline.md</code> and <code>docs/project/coverage/2026-08-29-r0-backend-coverage-baseline.json</code>; profile <code>/tmp/devenglish-go-db-20260829-workspace-resolution2.cov</code>. GitHub CI has not been run from this local checkout.</p>
+
+    <h2>Latest continuation — web boot-state hardening</h2>
+    <p>The web entrypoint now presents a small branded loading card before Flutter initializes, honors reduced-motion preferences and exposes a reloadable failure state after 30 seconds. The boot layer is removed automatically when Flutter creates its host surface, so slow or failed engine startup is no longer indistinguishable from a blank page. A fresh local reload of the rebuilt artifact at <code>http://localhost:8093/?boot=verification</code> rendered the <code>DevEnglish</code> shell with <code>bootNodes=0</code>, <code>flutterPanes=1</code> and no captured warning/error logs. This remains local startup evidence, not real-device acceptance.</p>
+    <p>Evidence: <code>web/index.html</code>, <code>docs/project/TEST_LOG.md</code> and the acceptance audit.</p>
+
+    <h2>Latest continuation — context-grounded assistant</h2>
+    <p>Work and Knowledge actions can open the assistant with a canonical Project, Task, Decision or Knowledge Source reference. The backend validates that reference inside the authenticated workspace, stores it with the conversation, places its evidence first, rejects context switching with a conflict and keeps the final retrieval set bounded to 20 items. A missing record is rejected before a new conversation is created. The client can list lightweight conversation metadata and reopen one transcript on demand without loading every message during bootstrap.</p>
+    <p>Evidence records: <code>docs/project/agent-runs/2026-08-29-grounded-assistant-context.md</code> and the latest entries in <code>docs/project/TEST_LOG.md</code>.</p>
+
+    <h2>Latest continuation — HTTP action boundary tests</h2>
+    <p>The HTTP action adapter now has focused coverage for target projection, idempotency-key validation, action/MCP error mapping, missing services, malformed bodies, missing confirmation keys and empty token scopes. Configured legacy Project/Task/Decision trash routes and the full MCP <code>entity_trash</code> path share the same Work challenge, expected-version, replay and receipt boundary.</p>
+    <p>Evidence record: <code>backend/internal/httpapi/actions_test.go</code>, the continuation boundary tests and <code>backend/internal/mcp/application_full_test.go</code>. The focused HTTP/MCP packages now have <code>232</code>/<code>132</code> passing tests; HTTP measures <code>90.12%</code> coverage in the latest PostgreSQL-enabled profile.</p>
+
+    <h2>Latest continuation — persistence and service boundary tests</h2>
+    <p>PostgreSQL MCP token persistence now has regression evidence for invalid replay metadata, conflicting idempotency, expiry/revoke behavior and corrupt scope rows. Knowledge service tests cover unsupported read capabilities, repository error propagation, blank-search short-circuiting and invalid workspace/entity identifiers. Application factory tests cover missing durable pools and database error mapping without leaking driver details.</p>
+    <p>Evidence records: <code>backend/internal/mcp/postgres_tokens_integration_test.go</code>, <code>backend/internal/knowledge/service_boundary_test.go</code> and <code>backend/internal/application/factory_boundary_test.go</code>. The latest PostgreSQL-enabled profile measures <code>77.40%</code> total statement coverage (<code>9354/12085</code>); Application is <code>90.60%</code>, Knowledge <code>90.25%</code> and MCP <code>90.84%</code>.</p>
+
+    <h2>Latest continuation — Drive read-only token refresh</h2>
+    <p>The Drive connector accepts either a short-lived access token for local smoke or a client ID, client secret and refresh token for a read-only OAuth source. The refresh source requests only <code>https://www.googleapis.com/auth/drive.readonly</code>, keeps refreshed access tokens in memory, redacts refresh failures, shares a bounded 30-second HTTP client with Drive API calls through <code>oauth2.HTTPClient</code>, and propagates request cancellation to the refresh exchange. Static access tokens remain supported for compatibility. The tests use injected HTTP fixtures and do not call Google or expose credentials; live authorization, quota and rate-limit behavior remain open.</p>
+    <p>Evidence records: <code>backend/internal/integrations/connectors_read_test.go</code> and <code>docs/project/agent-runs/2026-08-29-drive-oauth-context-cancellation.md</code>; configuration examples are in <code>.env.example</code>, <code>infra/production.env.example</code> and <code>README.md</code>.</p>
+
+    <h2>Latest continuation — fail-closed workspace resolution</h2>
+    <p>Workspace resolution now creates a deterministic workspace only for a genuinely fresh owner and serializes that creation with an owner-row lock. Owner mismatch, deleted targets, multiple active mappings, missing owners and ambiguous historical mappings return explicit errors; the HTTP boundary maps unresolved operator cases to <code>503</code>. This closes silent legacy selection without inventing a production backfill or workspace-migration policy.</p>
+    <p>Evidence record: <code>docs/project/agent-runs/2026-08-29-workspace-resolution-guard.md</code>. Targeted default and PostgreSQL-enabled tests passed <code>292</code> and <code>301</code>; full default normal/race runs passed <code>985</code> each and PostgreSQL normal/race runs passed <code>1060</code> each.</p>
+
+    <h2>Latest continuation — usage accounting hardening</h2>
+    <p>DeepSeek usage records now preserve provider-reported token counts and model identity. Preflight reservations are kept separate from final usage, and STT, pronunciation and TTS records are marked unavailable when the provider interface does not return billable usage metadata. The usage summary and Settings surface the unavailable-record count so a partial cost total is not presented as complete billing data.</p>
+    <p>Evidence record: <code>docs/project/agent-runs/2026-08-29-usage-accounting-hardening.md</code>.</p>
+
+    <h2>Latest continuation — MCP transport hardening</h2>
+    <p>The <code>/mcp</code> adapter now enforces the Streamable HTTP POST negotiation contract by requiring clients to allow both <code>application/json</code> and <code>text/event-stream</code>. An optional <code>MCP-Protocol-Version</code> header is checked against supported versions, notifications return <code>202 Accepted</code> without a body, and GET remains an explicit <code>405 Allow: POST</code> because this server does not publish unsolicited SSE events.</p>
+    <p>Evidence record: <code>docs/project/agent-runs/2026-08-29-mcp-streamable-http-hardening.md</code>.</p>
+
+    <h2>Latest continuation — HTTP boundary refresh</h2>
+    <p>HTTP v2 regression coverage now checks method and <code>Allow</code> headers, product and connector error mappings, and generic error serialization. Generic connector/provider errors pass through the shared credential redactor so credential-shaped values are not exposed in responses. The refresh also adds bounded assistant, application and MCP validation tests.</p>
+    <p>Evidence record: <code>docs/project/agent-runs/2026-08-29-http-boundary-and-coverage-refresh.md</code>.</p>
+
+    <h2>Latest continuation — acceptance refresh</h2>
+    <p>The first Flutter Chrome smoke found a real Learning contract regression: when legacy learning metrics were unavailable, the screen hid the invariant that learning observations remain separate from canonical work data. The screen now renders that invariant unconditionally, keeps legacy availability as a separate status line, and the affected responsive goldens have been regenerated. The corrected Chrome smoke now passes the Today → Work → Knowledge → Learning route sequence.</p>
+    <p>Evidence record: <code>docs/project/agent-runs/2026-08-29-acceptance-refresh.md</code>.</p>
+
+    <h2>Latest continuation — local acceptance gate refresh</h2>
+    <p>The latest source and runtime refresh passes <code>1060</code> PostgreSQL-enabled Go tests and <code>1060</code> PostgreSQL-enabled race tests across <code>23</code> packages; the default normal/race runs pass <code>985</code> each. The latest PostgreSQL-enabled coverage profile measures <code>77.40%</code> (<code>9354/12085</code> statements), with Application <code>90.60%</code>, Knowledge <code>90.25%</code>, MCP <code>90.84%</code>, Work <code>90.03%</code>, Connectors <code>90.06%</code> and HTTP API <code>90.13%</code>. The raw package gate passes, and the total is above the recorded R0 baseline of <code>66.78%</code>.</p>
+    <p>Flutter analyze, the full suite (<code>54</code> passed, <code>2</code> environment skips), the production-shell test in production mode, Chrome route smoke and the web release build all exit <code>0</code>. A fresh in-app browser session loaded <code>http://localhost:8093/</code>, rendered Today, navigated through Work/Knowledge/Learning, and returned canonical Knowledge results with no captured console errors or warnings. A real text-assistant question also stayed visible during source checking and returned grounded evidence plus an explicit unknown boundary after about <code>16.4s</code>; this is functional smoke evidence, not a latency SLO.</p>
+    <p>Evidence record: <code>docs/project/TEST_LOG.md</code>; the latest disposable coverage profile is <code>/tmp/devenglish-go-db-20260829-workspace-resolution2.cov</code>. This remains local smoke evidence, not real-device/operator acceptance or release authorization.</p>
+
+    <h2>Latest continuation — migration preview and rollback</h2>
+    <p><code>scripts/db_migrate.sh</code> now supports <code>DRY_RUN=YES</code> for a non-mutating report of applied and pending migrations. The disposable PostgreSQL harness verified that a fresh preview reports all <code>19</code> migrations as pending without creating <code>schema_migrations</code>; the real run then applied <code>000..018</code>, the second run was idempotent, and an injected failing migration rolled back successfully.</p>
+    <p>Evidence record: <code>docs/project/agent-runs/2026-08-29-migration-dry-run.md</code>. This is a local operator-preview and recovery check only; it does not authorize or perform a production migration.</p>
+
+    <h2>Earlier continuation — V2 workspace-scope failure matrix</h2>
+    <p>The HTTP boundary exercises every V2 route family with an injected workspace-initialization failure. All <code>42</code> cases return the original server error, proving that adapters fail closed instead of selecting an implicit workspace. The matrix was recorded at <code>131</code> passing tests and <code>82.5%</code> coverage before the later action-boundary additions; the current package totals are recorded above.</p>
+    <p>Evidence record: <code>backend/internal/httpapi/v2_scope_failure_test.go</code> and the follow-up in <code>docs/project/agent-runs/2026-08-29-acceptance-refresh.md</code>.</p>
+
+    <h2>Mobile surfaces</h2>
+    <p>These are repository screenshots used for the implementation walkthrough. They show the intended mobile-first product direction rather than a claim of real-device acceptance.</p>
+    <div class="screens">
+      <figure><img src="assets/today-mobile.jpg" alt="Today mobile surface"><figcaption>Today</figcaption></figure>
+      <figure><img src="assets/work-mobile.jpg" alt="Work mobile surface"><figcaption>Work</figcaption></figure>
+      <figure><img src="assets/knowledge-mobile.jpg" alt="Knowledge mobile surface"><figcaption>Knowledge</figcaption></figure>
+      <figure><img src="assets/learning-mobile.jpg" alt="Learning mobile surface"><figcaption>Learning</figcaption></figure>
+      <figure><img src="assets/today-chat-mobile.jpg" alt="Today assistant chat mobile surface"><figcaption>Assistant chat</figcaption></figure>
+    </div>
+
+    <h2>Quality and runtime gates</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Gate</th><th>Observed result</th></tr></thead>
+        <tbody>
+          <tr><td>Flutter tests</td><td><span class="status">Passed locally</span> — full suite passed 63 tests with 2 environment skips, exit <code>0</code>; production-shell focused suite passed 11 tests in production mode, including late assistant/history/opened-conversation/mutation session invalidation coverage. Workspace UI and focused golden/state suites also passed.</td></tr>
+          <tr><td>Flutter static/build</td><td><span class="status">Passed</span> — analyze, web release build with <code>--no-wasm-dry-run</code>, Android debug build and Android release artifact generation all passed locally.</td></tr>
+          <tr><td>Browser smoke</td><td><span class="status">Passed</span> — rebuilt release artifact renders Today and Learning without console warnings/errors; Flutter Chrome smoke covers navigation through all four destinations, and the authenticated production-shell regression test traverses Today → Work → Knowledge → Learning → Today with surface assertions. Mobile goldens cover 390x844 and 430x932. Flutter's DOM exposes only its accessibility placeholder, so no DOM-semantic assertion is claimed.</td></tr>
+          <tr><td>Go tests</td><td><span class="status">Passed</span> — 1060 PostgreSQL-enabled tests across 23 packages; the PostgreSQL-enabled race suite also passed 1060 tests.</td></tr>
+          <tr><td>HTTP boundary</td><td><span class="status">Passed locally</span> — 228 tests cover workspace isolation, query normalization, connector pre-provider validation, method/allow contracts, product/connector status mapping, credential redaction, empty-input rejection, action-service validation, configured Work trash confirmation and the 42-case workspace-initialization failure matrix. MCP adds 132 focused tests for the corresponding production path.</td></tr>
+          <tr><td>Go quality</td><td><span class="status">Passed</span> — vet, gofmt and diff check.</td></tr>
+          <tr><td>Production-shaped Docker smoke</td><td><span class="status">Passed</span> — 19 migrations, embedding 200, login/session 200, Project/Task/Decision create-update-conflict/history 201/200/409/200, MCP issue/initialize/revoke/revoked 201/200/204/401, knowledge import/search 201/200, CORS 204/403, provider fail-closed 500, logout 204.</td></tr>
+          <tr><td>Capacity/migration</td><td><span class="status">Passed locally</span> — the disposable migration harness previews all <code>19</code> migrations without creating <code>schema_migrations</code>, applies <code>000..018</code>, proves idempotent re-application and rollback of a failing migration; the legacy upgrade preserves snapshots/backfill isolation and the 100,000-chunk FTS/pagination harness also passed.</td></tr>
+          <tr><td>MCP SDK conformance</td><td><span class="status">Passed locally</span> — official MCP Go SDK test <code>62/62</code>, including modern handshake, tool/resource discovery, resource read and bearer-authenticated tool call.</td></tr>
+          <tr><td>Release web smoke</td><td><span class="status">Passed locally</span> — a fresh in-app browser loaded <code>http://localhost:8093/</code>, rendered Today, navigated through Work/Knowledge/Learning and returned canonical Knowledge search results with no captured console errors/warnings; the boot layer was removed after Flutter startup (<code>bootNodes=0</code>, <code>flutterPanes=1</code>); Flutter Chrome smoke covers all four destinations and responsive goldens cover <code>390×844</code> and <code>430×932</code>. This is visual smoke evidence, not a real-device or DOM-semantic assertion.</td></tr>
+          <tr><td>Coverage threshold</td><td><span class="status">Package and total floor passed locally</span> — <code>77.40%</code> PostgreSQL-enabled all-backend statement coverage (<code>9354/12085</code>) versus the recorded R0 baseline <code>66.78%</code> (<code>4269/6393</code>); Application <code>90.60%</code>, Assistant <code>92.88%</code>, Knowledge <code>90.25%</code>, MCP <code>90.84%</code>, Work <code>90.03%</code>, Connectors <code>90.06%</code> and HTTP API <code>90.13%</code>. The raw-count checker exits <code>0</code> for all seven core packages. This does not grant release approval.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2>Reviewer and task boundary</h2>
+    <p>The repaired safe-write, persistent-MCP-token, Drive bootstrap/removal, workspace-isolation, manual-import-idempotency and MCP principal-binding paths have fresh local evidence. The previous bounded Sol Ultra read-only repair review is <code>approved</code> with no P0/P1 findings; the latest bounded review attempt terminated at the usage limit without a verdict. The canonical Flutter shell now imports public Today/Work/Knowledge/Learning feature boundaries, while the old workspace screen remains a compatibility facade. The product task graph <code>TASK-PRODUCT-001</code> through <code>TASK-PRODUCT-008</code> is authored and lint-clean: <code>TASK-PRODUCT-001</code> and OPS are <code>ready_to_review</code>, while successors 002–008 are <code>on_hold</code> behind sequential human lifecycle gates. The CyberOS-only verifier reports the protected pre-existing <code>.github/workflows/ci.yml</code> WIP snapshot finding; it was preserved intentionally.</p>
+
+    <h2>Acceptance checklist</h2>
+    <ul class="checks">
+      <li>Evidence is required for assistant citations; missing evidence is exposed as unknown/inferred.</li>
+      <li>Work mutations use expected version and idempotency boundaries.</li>
+      <li>Drive and GitHub imports are read-only and cursor-aware in V1.</li>
+      <li>GitHub issue/comment/label writes require an expiring one-time challenge.</li>
+      <li>REST and MCP use the same application semantics.</li>
+      <li>MCP POST negotiation requires JSON and SSE response types, with protocol-version compatibility checks.</li>
+      <li>Learning observations cannot mutate canonical Work or Knowledge.</li>
+      <li>Text transcript is retained when STT/TTS is used.</li>
+      <li>Production mode has no demo provider fallback.</li>
+      <li>Real-device U0 walkthrough and operator verdict are still pending.</li>
+      <li>The previous Sol Ultra repair review is approved; the latest bounded review attempt ended at the usage limit without a verdict.</li>
+      <li>Human lifecycle acceptance and human release authorization are still pending.</li>
+    </ul>
+
+    <h2>Reproduce locally</h2>
+    <p>From the repository root:</p>
+    <ul>
+      <li><code>rtk flutter test --reporter compact</code></li>
+      <li><code>rtk flutter analyze</code></li>
+      <li><code>rtk flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_BROWSER_SMOKE=true --dart-define=INTEGRATION_TEST_SHOULD_REPORT_RESULTS_TO_NATIVE=false --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://localhost:8080</code></li>
+      <li><code>rtk go test ./...</code> and <code>rtk go test -race ./...</code></li>
+      <li><code>rtk env DEVENGLISH_PRODUCTION_SMOKE=YES ./scripts/production_runtime_smoke.sh</code></li>
+    </ul>
+
+    <footer>
+      Source records: <code>docs/project/REBUILD_PLAN.md</code>, <code>docs/project/STATUS.md</code>, <code>docs/project/ROADMAP.md</code> and <code>docs/project/TEST_LOG.md</code>. Secrets and provider values are intentionally excluded. No commit, push, merge or deployment is implied by this report.
+    </footer>
+  </main>
+</body>
+</html>

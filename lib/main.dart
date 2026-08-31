@@ -14,9 +14,19 @@ import 'src/screens/settings_screen.dart';
 import 'src/screens/speaking_screen.dart';
 import 'src/screens/vocabulary_screen.dart';
 import 'src/screens/work_import_screen.dart';
-import 'src/screens/workspace_screen.dart';
+import 'src/app/workspace_shell.dart';
+import 'src/legacy_learning_gate.dart';
 import 'src/theme.dart';
+import 'src/api.dart';
 import 'src/workspace_controller.dart';
+import 'src/workspace_api.dart';
+
+// The new workspace is the default cutover surface. Set this compile-time
+// flag to `legacy` for a reversible rollback while preserving the old shell.
+const _workspaceShellMode = String.fromEnvironment(
+  'DEVENGLISH_WORKSPACE_SHELL',
+  defaultValue: 'new',
+);
 
 void main() {
   runApp(const DevEnglishApp());
@@ -37,14 +47,27 @@ class _DevEnglishAppState extends State<DevEnglishApp> {
   late final bool _ownsController;
   late final WorkspaceController _workspaceController;
   late final bool _ownsWorkspaceController;
+  late final DevEnglishApi _api;
 
   @override
   void initState() {
     super.initState();
     _ownsController = widget.controller == null;
-    _controller = widget.controller ?? AppController();
+    _api = DevEnglishApi();
+    _controller =
+        widget.controller ??
+        AppController(api: _api, loadLegacy: _workspaceShellMode == 'legacy');
     _ownsWorkspaceController = widget.workspaceController == null;
-    _workspaceController = widget.workspaceController ?? WorkspaceController();
+    _workspaceController =
+        widget.workspaceController ??
+        WorkspaceController(
+          // Keep injected shell tests and explicit demo controllers
+          // deterministic. The normal app gets the production workspace
+          // adapter and loads canonical data separately from legacy learning.
+          workspaceApi: widget.controller == null
+              ? WorkspaceApi(api: _api)
+              : null,
+        );
     _controller.load();
   }
 
@@ -81,11 +104,47 @@ class _AppShell extends StatefulWidget {
 
 class _AppShellState extends State<_AppShell> {
   int _legacyIndex = 0;
+  bool _workspaceAttempted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.onSessionInvalidated =
+        widget.workspaceController.resetForLogout;
+    widget.controller.addListener(_maybeLoadWorkspace);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeLoadWorkspace());
+  }
+
+  @override
+  void dispose() {
+    widget.controller.onSessionInvalidated = null;
+    widget.controller.removeListener(_maybeLoadWorkspace);
+    super.dispose();
+  }
+
+  void _maybeLoadWorkspace() {
+    if (_workspaceShellMode == 'legacy' ||
+        !mounted ||
+        !widget.workspaceController.hasWorkspaceApi) {
+      return;
+    }
+    if (!widget.controller.authenticated) {
+      _workspaceAttempted = false;
+      return;
+    }
+    if (_workspaceAttempted || widget.workspaceController.loading) return;
+    if (widget.workspaceController.canonicalLoaded) return;
+    _workspaceAttempted = true;
+    widget.workspaceController.load();
+  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: widget.controller,
+      animation: Listenable.merge([
+        widget.controller,
+        widget.workspaceController,
+      ]),
       builder: (context, _) {
         // The workspace shell is self-contained in development, so it can
         // render immediately while the optional legacy data bootstrap runs.
@@ -96,6 +155,9 @@ class _AppShellState extends State<_AppShell> {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
+        }
+        if (_workspaceShellMode == 'legacy') {
+          return _buildLegacyShell();
         }
         if (widget.controller.requiresAuthentication &&
             !widget.controller.authenticated) {
@@ -136,9 +198,26 @@ class _AppShellState extends State<_AppShell> {
         }
         if (widget.controller.requiresAuthentication &&
             !widget.controller.usingDemo) {
-          // The workspace preview has no canonical production data adapter
-          // yet. Keep authenticated production users on the existing shell
-          // until that composition is implemented.
+          if (widget.workspaceController.hasWorkspaceApi &&
+              !widget.workspaceController.canonicalLoaded) {
+            return _workspaceLoadingOrError();
+          }
+          if (widget.workspaceController.hasWorkspaceApi) {
+            return WorkspaceShell(
+              controller: widget.workspaceController,
+              learningController: widget.controller,
+              onPractice: _openPractice,
+              onReview: _openReview,
+              onProgress: _openProgress,
+              onDiagnostic: _openDiagnostic,
+              onRoleplay: () => _openRoleplay(null),
+              onCopilot: _openCopilot,
+              onSpeaking: _openSpeaking,
+              onSettings: _openSettings,
+            );
+          }
+          // Explicitly injected legacy controllers keep the compatibility
+          // shell until their caller also supplies a workspace adapter.
           return _buildLegacyShell();
         }
         return WorkspaceShell(
@@ -150,9 +229,49 @@ class _AppShellState extends State<_AppShell> {
           onDiagnostic: _openDiagnostic,
           onRoleplay: () => _openRoleplay(null),
           onCopilot: _openCopilot,
+          onSpeaking: _openSpeaking,
           onSettings: _openSettings,
         );
       },
+    );
+  }
+
+  Widget _workspaceLoadingOrError() {
+    final workspace = widget.workspaceController;
+    if (workspace.loading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_outlined, size: 48),
+              const SizedBox(height: 16),
+              const Text(
+                'Workspace production chưa sẵn sàng',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                workspace.error ?? 'Không thể tải dữ liệu workspace.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () {
+                  _workspaceAttempted = false;
+                  _maybeLoadWorkspace();
+                },
+                icon: const Icon(Icons.refresh),
+                label: const Text('Thử lại'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -212,14 +331,18 @@ class _AppShellState extends State<_AppShell> {
   void _openPractice() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => PracticeScreen(
+        builder: (_) => LegacyLearningGate(
           controller: widget.controller,
-          onStartMission: _startMission,
-          onWorkImport: _openWorkImport,
-          onSpeaking: _openSpeaking,
-          onRoleplay: _openRoleplay,
-          onCopilot: _openCopilot,
-          onVocabulary: _openVocabulary,
+          title: 'Practice',
+          builder: (_) => PracticeScreen(
+            controller: widget.controller,
+            onStartMission: _startMission,
+            onWorkImport: _openWorkImport,
+            onSpeaking: _openSpeaking,
+            onRoleplay: _openRoleplay,
+            onCopilot: _openCopilot,
+            onVocabulary: _openVocabulary,
+          ),
         ),
       ),
     );
@@ -228,7 +351,11 @@ class _AppShellState extends State<_AppShell> {
   void _openReview() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ReviewScreen(controller: widget.controller),
+        builder: (_) => LegacyLearningGate(
+          controller: widget.controller,
+          title: 'Review',
+          builder: (_) => ReviewScreen(controller: widget.controller),
+        ),
       ),
     );
   }
@@ -236,7 +363,11 @@ class _AppShellState extends State<_AppShell> {
   void _openProgress() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ProgressScreen(controller: widget.controller),
+        builder: (_) => LegacyLearningGate(
+          controller: widget.controller,
+          title: 'Progress',
+          builder: (_) => ProgressScreen(controller: widget.controller),
+        ),
       ),
     );
   }
@@ -261,7 +392,11 @@ class _AppShellState extends State<_AppShell> {
   void _openSpeaking() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SpeakingScreen(controller: widget.controller),
+        builder: (_) => LegacyLearningGate(
+          controller: widget.controller,
+          title: 'Speaking',
+          builder: (_) => SpeakingScreen(controller: widget.controller),
+        ),
       ),
     );
   }
@@ -269,9 +404,13 @@ class _AppShellState extends State<_AppShell> {
   void _openRoleplay([String? scenarioType]) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => RoleplayScreen(
+        builder: (_) => LegacyLearningGate(
           controller: widget.controller,
-          scenarioType: scenarioType,
+          title: 'AI Roleplay',
+          builder: (_) => RoleplayScreen(
+            controller: widget.controller,
+            scenarioType: scenarioType,
+          ),
         ),
       ),
     );
@@ -280,7 +419,11 @@ class _AppShellState extends State<_AppShell> {
   void _openCopilot() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => CopilotScreen(controller: widget.controller),
+        builder: (_) => LegacyLearningGate(
+          controller: widget.controller,
+          title: 'English Copilot',
+          builder: (_) => CopilotScreen(controller: widget.controller),
+        ),
       ),
     );
   }
@@ -288,7 +431,11 @@ class _AppShellState extends State<_AppShell> {
   void _openVocabulary() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => VocabularyScreen(controller: widget.controller),
+        builder: (_) => LegacyLearningGate(
+          controller: widget.controller,
+          title: 'Technical Vocabulary',
+          builder: (_) => VocabularyScreen(controller: widget.controller),
+        ),
       ),
     );
   }
@@ -296,7 +443,11 @@ class _AppShellState extends State<_AppShell> {
   void _openDiagnostic() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => DiagnosticScreen(controller: widget.controller),
+        builder: (_) => LegacyLearningGate(
+          controller: widget.controller,
+          title: 'Diagnostic',
+          builder: (_) => DiagnosticScreen(controller: widget.controller),
+        ),
       ),
     );
   }
@@ -304,7 +455,12 @@ class _AppShellState extends State<_AppShell> {
   void _openSettings() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(controller: widget.controller),
+        builder: (_) => _workspaceShellMode == 'legacy'
+            ? SettingsScreen(controller: widget.controller)
+            : SettingsDataGate(
+                controller: widget.controller,
+                builder: (_) => SettingsScreen(controller: widget.controller),
+              ),
       ),
     );
   }

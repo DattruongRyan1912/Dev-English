@@ -293,7 +293,6 @@ class EvaluationResult {
     required this.mainIssue,
     required this.nextAction,
     required this.corrections,
-    this.scored = true,
   });
 
   final double score;
@@ -302,7 +301,6 @@ class EvaluationResult {
   final String mainIssue;
   final String nextAction;
   final List<Correction> corrections;
-  final bool scored;
 
   factory EvaluationResult.fromJson(Map<String, dynamic> json) =>
       EvaluationResult(
@@ -314,7 +312,6 @@ class EvaluationResult {
         corrections: _maps(
           json['corrections'],
         ).map(Correction.fromJson).toList(),
-        scored: json['scored'] != false,
       );
 }
 
@@ -689,18 +686,21 @@ class UsageSummary {
     required this.estimatedCost,
     required this.budgetVnd,
     required this.budgetUsedPercent,
+    required this.unavailableRecords,
   });
 
   final String month;
   final double estimatedCost;
   final int budgetVnd;
   final double budgetUsedPercent;
+  final int unavailableRecords;
 
   factory UsageSummary.fromJson(Map<String, dynamic> json) => UsageSummary(
     month: _string(json['month'], ''),
     estimatedCost: _double(json['estimatedCost']),
     budgetVnd: _int(json['budgetVnd'], 150000),
     budgetUsedPercent: _double(json['budgetUsedPercent']),
+    unavailableRecords: _int(json['unavailableRecords'], 0),
   );
 }
 

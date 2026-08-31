@@ -689,7 +689,7 @@ func (s *PostgresStore) SaveSpeakingSession(ctx context.Context, session domain.
 }
 
 func (s *PostgresStore) Usage(ctx context.Context, from time.Time) ([]domain.UsageRecord, error) {
-	rows, err := s.Pool.Query(ctx, `SELECT provider, model, feature, input_tokens, output_tokens, audio_seconds, tts_characters, estimated_cost, created_at FROM ai_usage WHERE user_id=$1 AND created_at >= $2 ORDER BY created_at DESC`, UserID(ctx), from)
+	rows, err := s.Pool.Query(ctx, `SELECT provider, model, feature, input_tokens, output_tokens, usage_available, audio_seconds, tts_characters, estimated_cost, created_at FROM ai_usage WHERE user_id=$1 AND created_at >= $2 ORDER BY created_at DESC`, UserID(ctx), from)
 	if err != nil {
 		return nil, err
 	}
@@ -697,7 +697,7 @@ func (s *PostgresStore) Usage(ctx context.Context, from time.Time) ([]domain.Usa
 	items := make([]domain.UsageRecord, 0)
 	for rows.Next() {
 		var item domain.UsageRecord
-		if err := rows.Scan(&item.Provider, &item.Model, &item.Feature, &item.InputTokens, &item.OutputTokens, &item.AudioSeconds, &item.TTSCharacters, &item.EstimatedCost, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.Provider, &item.Model, &item.Feature, &item.InputTokens, &item.OutputTokens, &item.UsageAvailable, &item.AudioSeconds, &item.TTSCharacters, &item.EstimatedCost, &item.CreatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -706,7 +706,101 @@ func (s *PostgresStore) Usage(ctx context.Context, from time.Time) ([]domain.Usa
 }
 
 func (s *PostgresStore) SaveUsage(ctx context.Context, record domain.UsageRecord) error {
-	_, err := s.Pool.Exec(ctx, `INSERT INTO ai_usage (user_id, provider, model, feature, input_tokens, output_tokens, audio_seconds, tts_characters, estimated_cost, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, UserID(ctx), record.Provider, record.Model, record.Feature, record.InputTokens, record.OutputTokens, record.AudioSeconds, record.TTSCharacters, record.EstimatedCost, record.CreatedAt)
+	_, err := s.Pool.Exec(ctx, `INSERT INTO ai_usage (user_id, provider, model, feature, input_tokens, output_tokens, usage_available, audio_seconds, tts_characters, estimated_cost, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, UserID(ctx), record.Provider, record.Model, record.Feature, record.InputTokens, record.OutputTokens, record.UsageAvailable, record.AudioSeconds, record.TTSCharacters, record.EstimatedCost, record.CreatedAt)
+	return err
+}
+
+func (s *PostgresStore) ReserveUsage(ctx context.Context, request UsageReservationRequest) (bool, error) {
+	if request.ID == "" || request.UserID == "" || request.MonthStart.IsZero() ||
+		request.Amount <= 0 || request.Limit <= 0 {
+		return false, errors.New("invalid usage reservation")
+	}
+	if request.Metric != UsageMetricTokens && request.Metric != UsageMetricCost {
+		return false, errors.New("invalid usage reservation metric")
+	}
+	expiresAt := request.ExpiresAt.UTC()
+	if expiresAt.IsZero() {
+		expiresAt = time.Now().UTC().Add(5 * time.Minute)
+	}
+	monthStart := request.MonthStart.UTC()
+	monthEnd := monthStart.AddDate(0, 1, 0)
+	tx, err := s.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM ai_usage_reservations WHERE status = 'active' AND expires_at <= now()`); err != nil {
+		return false, err
+	}
+	lockKey := fmt.Sprintf("%s|%s|%s", request.UserID, request.Metric, request.Feature)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, lockKey); err != nil {
+		return false, err
+	}
+	var existingStatus string
+	err = tx.QueryRow(ctx, `SELECT status FROM ai_usage_reservations WHERE id = $1`, request.ID).Scan(&existingStatus)
+	if err == nil {
+		return existingStatus == "active" || existingStatus == "committed", nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return false, err
+	}
+
+	var used float64
+	switch request.Metric {
+	case UsageMetricTokens:
+		err = tx.QueryRow(ctx, `
+			SELECT COALESCE(SUM(input_tokens + output_tokens), 0)::double precision
+			FROM ai_usage
+			WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
+			  AND ($4 = '' OR feature = $4)
+		`, request.UserID, monthStart, monthEnd, request.Feature).Scan(&used)
+	case UsageMetricCost:
+		err = tx.QueryRow(ctx, `
+			SELECT COALESCE(SUM(estimated_cost), 0)::double precision
+			FROM ai_usage
+			WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
+			  AND ($4 = '' OR feature = $4)
+		`, request.UserID, monthStart, monthEnd, request.Feature).Scan(&used)
+	}
+	if err != nil {
+		return false, err
+	}
+	var reserved float64
+	if err := tx.QueryRow(ctx, `
+		SELECT COALESCE(SUM(amount), 0)::double precision
+		FROM ai_usage_reservations
+		WHERE user_id = $1 AND month_start = $2 AND metric = $3
+		  AND feature = $4 AND status = 'active' AND expires_at > now()
+	`, request.UserID, monthStart, request.Metric, request.Feature).Scan(&reserved); err != nil {
+		return false, err
+	}
+	if used+reserved+request.Amount > request.Limit {
+		return false, nil
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO ai_usage_reservations
+			(id, user_id, month_start, feature, metric, amount, limit_value, expires_at, status)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'active')
+	`, request.ID, request.UserID, monthStart, request.Feature, request.Metric, request.Amount, request.Limit, expiresAt); err != nil {
+		return false, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+func (s *PostgresStore) CompleteUsageReservation(ctx context.Context, id string, committed bool) error {
+	status := "released"
+	if committed {
+		status = "committed"
+	}
+	_, err := s.Pool.Exec(ctx, `
+		UPDATE ai_usage_reservations
+		SET status = $2, completed_at = now()
+		WHERE id = $1 AND status = 'active'
+	`, id, status)
 	return err
 }
 

@@ -9,6 +9,7 @@ import (
 const (
 	ProviderGoogleDrive = "google_drive"
 	ProviderGitHub      = "github"
+	ProviderWork        = "work"
 )
 
 // DriveCursor is opaque to application services and is only advanced with a
@@ -17,9 +18,7 @@ type DriveCursor struct {
 	Token string
 }
 
-func (c DriveCursor) Valid() bool {
-	return strings.TrimSpace(c.Token) != ""
-}
+func (c DriveCursor) Valid() bool { return strings.TrimSpace(c.Token) != "" }
 
 // DriveSourceItem is a read-only, revision-addressable Drive item. Content is
 // already normalized by the connector; application services never receive an
@@ -33,6 +32,10 @@ type DriveSourceItem struct {
 	ContentHash  string
 	ModifiedTime time.Time
 	Text         string
+	// Removed is a tombstone emitted by the Drive changes feed when the
+	// provider no longer exposes the file. Tombstones are handled by the sync
+	// service and never become searchable knowledge content.
+	Removed bool
 }
 
 func (i DriveSourceItem) Validate() error {
@@ -53,9 +56,15 @@ type DriveListRequest struct {
 }
 
 type DrivePage struct {
-	Items      []DriveSourceItem
+	Items []DriveSourceItem
+	// NextCursor is the provider continuation token when HasMore is true.
 	NextCursor DriveCursor
 	HasMore    bool
+	// CheckpointCursor is the provider's durable start token when the page is
+	// complete. Google Drive Changes API returns newStartPageToken at the end
+	// of a feed; keeping it separate prevents callers from confusing a stable
+	// future checkpoint with a page that still needs to be fetched.
+	CheckpointCursor DriveCursor
 }
 
 // DriveReader is deliberately read-only. Sync callers must persist NextCursor
@@ -138,12 +147,12 @@ type GitHubReadClient interface {
 }
 
 type SafeWriteMetadata struct {
-	WorkspaceID      string
 	IdempotencyKey   string
 	ExpectedRevision string
-	// The following fields are confirmation data issued by the application
-	// layer. The guarded service requires them before a provider mutation is
-	// allowed.
+	// The following fields are optional on the low-level writer interface for
+	// backward compatibility. GuardedGitHubWriter requires them before a
+	// provider mutation is allowed.
+	WorkspaceID string
 	UserID      string
 	ChallengeID string
 	ActionHash  string
@@ -154,9 +163,6 @@ type SafeWriteMetadata struct {
 func (m SafeWriteMetadata) Validate() error {
 	if strings.TrimSpace(m.IdempotencyKey) == "" {
 		return ErrMissingIdempotencyKey
-	}
-	if strings.TrimSpace(m.WorkspaceID) == "" {
-		return ErrInvalidWorkspaceID
 	}
 	return nil
 }

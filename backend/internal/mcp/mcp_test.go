@@ -48,6 +48,54 @@ func (errorReader) Read([]byte) (int, error) {
 	return 0, io.ErrUnexpectedEOF
 }
 
+type tokenPersistenceFixture struct {
+	mu     sync.Mutex
+	tokens map[string]PersistedToken
+}
+
+func (p *tokenPersistenceFixture) Put(_ context.Context, token PersistedToken) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.tokens == nil {
+		p.tokens = make(map[string]PersistedToken)
+	}
+	if previous, exists := p.tokens[token.ID]; exists {
+		if previous.ID != token.ID || previous.ExpiresAt != token.ExpiresAt || previous.WorkspaceID != token.WorkspaceID || previous.UserID != token.UserID || !reflect.DeepEqual(previous.Scopes, token.Scopes) || !reflect.DeepEqual(previous.Digest, token.Digest) {
+			return ErrTokenPersistence
+		}
+		return nil
+	}
+	copyToken := token
+	copyToken.Digest = append([]byte(nil), token.Digest...)
+	copyToken.Scopes = append([]Scope(nil), token.Scopes...)
+	p.tokens[token.ID] = copyToken
+	return nil
+}
+
+func (p *tokenPersistenceFixture) Get(_ context.Context, id string) (PersistedToken, bool, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	token, ok := p.tokens[id]
+	if !ok {
+		return PersistedToken{}, false, nil
+	}
+	token.Digest = append([]byte(nil), token.Digest...)
+	token.Scopes = append([]Scope(nil), token.Scopes...)
+	return token, true, nil
+}
+
+func (p *tokenPersistenceFixture) Revoke(_ context.Context, id string, _ time.Time) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	token, ok := p.tokens[id]
+	if !ok {
+		return ErrTokenPersistence
+	}
+	token.Revoked = true
+	p.tokens[id] = token
+	return nil
+}
+
 func testRequest(id, method, params string) Request {
 	request := Request{
 		JSONRPC: "2.0",
@@ -60,6 +108,11 @@ func testRequest(id, method, params string) Request {
 		request.Params = json.RawMessage(params)
 	}
 	return request
+}
+
+func setMCPRequestHeaders(request *http.Request, token string) {
+	request.Header.Set(AuthorizationHeader, "Bearer "+token)
+	request.Header.Set(AcceptHeader, "application/json, text/event-stream")
 }
 
 func mustReveal(t *testing.T, issued *IssuedToken) string {
@@ -189,6 +242,40 @@ func TestTokenStoreIssueVerifyTTLRevokeAndDigestStorage(t *testing.T) {
 	}
 	if err := store.Revoke("not-a-token"); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("invalid Revoke() error = %v, want ErrInvalidToken", err)
+	}
+}
+
+func TestTokenStorePersistenceSurvivesRestartAndSharesRevocation(t *testing.T) {
+	current := time.Date(2026, 8, 28, 12, 0, 0, 0, time.UTC)
+	persistence := &tokenPersistenceFixture{}
+	identity := TokenIdentity{WorkspaceID: "workspace-a", UserID: "user-a"}
+	firstStore := NewTokenStore(
+		WithTokenClock(func() time.Time { return current }),
+		WithTokenRandom(&incrementingReader{}),
+		WithTokenPersistence(persistence),
+	)
+	issued, err := firstStore.IssueForIdentity([]Scope{ScopeAssistantUse, ScopeKnowledgeRead}, identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	token := mustReveal(t, &issued)
+
+	secondStore := NewTokenStore(
+		WithTokenClock(func() time.Time { return current }),
+		WithTokenPersistence(persistence),
+	)
+	principal, err := secondStore.Verify(token, current)
+	if err != nil {
+		t.Fatalf("restart Verify() error = %v", err)
+	}
+	if principal.WorkspaceID != identity.WorkspaceID || principal.UserID != identity.UserID || !reflect.DeepEqual(principal.Scopes, issued.Scopes) {
+		t.Fatalf("restart principal = %+v", principal)
+	}
+	if err := secondStore.RevokeByIDForIdentity(issued.ID, identity); err != nil {
+		t.Fatalf("persistent revoke error = %v", err)
+	}
+	if _, err := firstStore.Verify(token, current); !errors.Is(err, ErrTokenRevoked) {
+		t.Fatalf("cross-store Verify() error = %v, want ErrTokenRevoked", err)
 	}
 }
 
@@ -704,23 +791,31 @@ func TestHandlerInitializeDiscoveryAndDispatchErrors(t *testing.T) {
 		WithProtocolVersion(" custom "),
 		WithSupportedProtocolVersions("", "legacy", "legacy"),
 		WithServerInfo(Implementation{Name: " server ", Version: " version "}),
+		WithServerInstructions(" guidance "),
 		WithMaxBodyBytes(128),
 		WithReplayGuard(replay),
 		nil,
 	)
-	if handler.ProtocolVersion != "custom" || handler.ServerInfo.Name != "server" || handler.MaxBodyBytes != 128 || handler.Replay != replay || len(handler.SupportedProtocolVersions) != 1 {
+	if handler.ProtocolVersion != "custom" || handler.ServerInfo.Name != "server" || handler.Instructions != "guidance" || handler.MaxBodyBytes != 128 || handler.Replay != replay || len(handler.SupportedProtocolVersions) != 1 {
 		t.Fatal("handler options were not applied as expected")
 	}
 	defaultHandler := NewHandler(nil, nil, WithProtocolVersion(" "), WithSupportedProtocolVersions("", ""), WithServerInfo(Implementation{}), WithMaxBodyBytes(0), WithReplayGuard(nil), nil)
-	if defaultHandler.Registry == nil || defaultHandler.MaxBodyBytes != DefaultMaxBodyBytes {
+	if defaultHandler.Registry == nil || defaultHandler.MaxBodyBytes != DefaultMaxBodyBytes || defaultHandler.Instructions != DefaultServerInstructions {
 		t.Fatal("handler defaults were not preserved")
+	}
+	if len([]rune(DefaultServerInstructions)) >= 512 {
+		t.Fatalf("default server instructions are too long: %d runes", len([]rune(DefaultServerInstructions)))
 	}
 
 	initParams := `{"protocolVersion":"custom","capabilities":{},"clientInfo":{"name":"client","version":"1"}}`
 	initResponse := mustResponse(t, handler.Dispatch(context.Background(), Principal{}, testRequest("1", "initialize", initParams), RequestMeta{}))
 	initResult := responseResult[InitializeResult](t, initResponse)
-	if initResult.ProtocolVersion != "custom" || initResult.ServerInfo.Name != "server" {
+	if initResult.ProtocolVersion != "custom" || initResult.ServerInfo.Name != "server" || initResult.Instructions != "guidance" {
 		t.Fatal("initialize response did not negotiate the configured version")
+	}
+	discoveryResult := responseResult[DiscoverResult](t, handler.Dispatch(context.Background(), Principal{}, testRequest("1-discovery", "server/discover", `{}`), RequestMeta{}))
+	if discoveryResult.Instructions != "guidance" {
+		t.Fatalf("discovery instructions = %q, want configured guidance", discoveryResult.Instructions)
 	}
 	legacyResponse := handler.Dispatch(context.Background(), Principal{}, testRequest("2", "initialize", `{"protocolVersion":"legacy"}`), RequestMeta{})
 	if legacyResponse == nil || legacyResponse.Error != nil {
@@ -1024,33 +1119,74 @@ func TestResourceDispatchNormalizationAndHTTPTransport(t *testing.T) {
 	if badAuthRecorder.Code != http.StatusUnauthorized {
 		t.Fatalf("bad authorization HTTP status = %d", badAuthRecorder.Code)
 	}
+	missingAcceptRecorder := httptest.NewRecorder()
+	missingAcceptRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+	missingAcceptRequest.Header.Set(AuthorizationHeader, "Bearer "+token)
+	httpHandler.ServeHTTP(missingAcceptRecorder, missingAcceptRequest)
+	if missingAcceptRecorder.Code != http.StatusNotAcceptable {
+		t.Fatalf("missing Accept HTTP status = %d", missingAcceptRecorder.Code)
+	}
+	partialAcceptRecorder := httptest.NewRecorder()
+	partialAcceptRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+	partialAcceptRequest.Header.Set(AuthorizationHeader, "Bearer "+token)
+	partialAcceptRequest.Header.Set(AcceptHeader, "application/json")
+	httpHandler.ServeHTTP(partialAcceptRecorder, partialAcceptRequest)
+	if partialAcceptRecorder.Code != http.StatusNotAcceptable {
+		t.Fatalf("partial Accept HTTP status = %d", partialAcceptRecorder.Code)
+	}
 	invalidJSONRecorder := httptest.NewRecorder()
 	invalidJSONRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader("not-json"))
-	invalidJSONRequest.Header.Set(AuthorizationHeader, "Bearer "+token)
+	setMCPRequestHeaders(invalidJSONRequest, token)
 	httpHandler.ServeHTTP(invalidJSONRecorder, invalidJSONRequest)
 	if invalidJSONRecorder.Code != http.StatusBadRequest {
 		t.Fatalf("invalid JSON HTTP status = %d", invalidJSONRecorder.Code)
 	}
 	largeRecorder := httptest.NewRecorder()
 	largeRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(strings.Repeat("x", 256)))
-	largeRequest.Header.Set(AuthorizationHeader, "Bearer "+token)
+	setMCPRequestHeaders(largeRequest, token)
 	httpHandler.ServeHTTP(largeRecorder, largeRequest)
 	if largeRecorder.Code != http.StatusRequestEntityTooLarge {
 		t.Fatalf("large HTTP status = %d", largeRecorder.Code)
 	}
 	validRecorder := httptest.NewRecorder()
 	validRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"resources/list"}`))
-	validRequest.Header.Set(AuthorizationHeader, "Bearer "+token)
+	setMCPRequestHeaders(validRequest, token)
 	httpHandler.ServeHTTP(validRecorder, validRequest)
 	if validRecorder.Code != http.StatusOK || validRecorder.Header().Get("Content-Type") != "application/json" || validRecorder.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("valid HTTP response = %d, headers=%v", validRecorder.Code, validRecorder.Header())
 	}
 	notificationRecorder := httptest.NewRecorder()
 	notificationRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","method":"notifications/initialized"}`))
-	notificationRequest.Header.Set(AuthorizationHeader, "Bearer "+token)
+	setMCPRequestHeaders(notificationRequest, token)
 	httpHandler.ServeHTTP(notificationRecorder, notificationRequest)
-	if notificationRecorder.Code != http.StatusNoContent {
+	if notificationRecorder.Code != http.StatusAccepted {
 		t.Fatalf("notification HTTP status = %d", notificationRecorder.Code)
+	}
+	if notificationRecorder.Body.Len() != 0 {
+		t.Fatalf("notification response body = %q, want empty", notificationRecorder.Body.String())
+	}
+	unsupportedVersionRecorder := httptest.NewRecorder()
+	unsupportedVersionRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+	setMCPRequestHeaders(unsupportedVersionRequest, token)
+	unsupportedVersionRequest.Header.Set(ProtocolVersionHeader, "2099-01-01")
+	httpHandler.ServeHTTP(unsupportedVersionRecorder, unsupportedVersionRequest)
+	if unsupportedVersionRecorder.Code != http.StatusBadRequest {
+		t.Fatalf("unsupported protocol version HTTP status = %d", unsupportedVersionRecorder.Code)
+	}
+	var unsupportedVersionResponse Response
+	if err := json.Unmarshal(unsupportedVersionRecorder.Body.Bytes(), &unsupportedVersionResponse); err != nil {
+		t.Fatalf("decode unsupported version response: %v", err)
+	}
+	if unsupportedVersionResponse.Error == nil || unsupportedVersionResponse.Error.Code != UnsupportedVersion {
+		t.Fatalf("unsupported protocol version response = %#v", unsupportedVersionResponse)
+	}
+	supportedVersionRecorder := httptest.NewRecorder()
+	supportedVersionRequest := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{"jsonrpc":"2.0","id":1,"method":"ping"}`))
+	setMCPRequestHeaders(supportedVersionRequest, token)
+	supportedVersionRequest.Header.Set(ProtocolVersionHeader, "2025-03-26")
+	httpHandler.ServeHTTP(supportedVersionRecorder, supportedVersionRequest)
+	if supportedVersionRecorder.Code != http.StatusOK {
+		t.Fatalf("supported protocol version HTTP status = %d", supportedVersionRecorder.Code)
 	}
 	serviceRecorder := httptest.NewRecorder()
 	NewHandler(registry, nil).ServeHTTP(serviceRecorder, httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{}`)))
@@ -1062,6 +1198,25 @@ func TestResourceDispatchNormalizationAndHTTPTransport(t *testing.T) {
 	nilHandler.ServeHTTP(nilRecorder, httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{}`)))
 	if nilRecorder.Code != http.StatusServiceUnavailable {
 		t.Fatalf("nil handler HTTP status = %d", nilRecorder.Code)
+	}
+}
+
+func TestAcceptNegotiationRequiresJSONAndSSE(t *testing.T) {
+	valid := []string{
+		"application/json, text/event-stream",
+		"text/event-stream; q=0.5, application/json; q=1",
+		"APPLICATION/JSON, TEXT/EVENT-STREAM",
+	}
+	for _, value := range valid {
+		if !acceptsRequiredResponseTypes(value) {
+			t.Errorf("acceptsRequiredResponseTypes(%q) = false, want true", value)
+		}
+	}
+	invalid := []string{"", "application/json", "text/event-stream", "*/*", "application/*, text/event-stream"}
+	for _, value := range invalid {
+		if acceptsRequiredResponseTypes(value) {
+			t.Errorf("acceptsRequiredResponseTypes(%q) = true, want false", value)
+		}
 	}
 }
 

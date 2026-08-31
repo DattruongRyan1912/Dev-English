@@ -8,6 +8,15 @@ migrations_dir="${MIGRATIONS_DIR:-$repo_root/infra/migrations}"
 postgres_service="${POSTGRES_SERVICE:-postgres}"
 postgres_user="${POSTGRES_USER:-devenglish}"
 postgres_db="${POSTGRES_DB:-devenglish}"
+dry_run="${DRY_RUN:-NO}"
+
+case "$dry_run" in
+  YES|NO) ;;
+  *)
+    printf 'DRY_RUN must be YES or NO.\n' >&2
+    exit 2
+    ;;
+esac
 
 compose=(docker compose -f "$compose_file")
 if [[ -f "$env_file" ]]; then
@@ -22,13 +31,6 @@ psql_exec() {
     "$@"
 }
 
-psql_exec -c '
-  CREATE TABLE IF NOT EXISTS schema_migrations (
-    version TEXT PRIMARY KEY,
-    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
-  )
-'
-
 shopt -s nullglob
 migrations=("$migrations_dir"/*.sql)
 if (( ${#migrations[@]} == 0 )); then
@@ -42,7 +44,47 @@ for migration in "${migrations[@]}"; do
     printf 'Unsafe migration filename: %s\n' "$version" >&2
     exit 1
   fi
+done
 
+if [[ "$dry_run" == "YES" ]]; then
+  printf 'Migration dry-run for %s using %s/%s. No schema changes will be made.\n' "$migrations_dir" "$postgres_service" "$postgres_db"
+  schema_table="$(psql_exec -Atqc "SELECT to_regclass('public.schema_migrations')")"
+  applied_count=0
+  pending_count=0
+  if [[ -z "$schema_table" ]]; then
+    printf 'schema_migrations: absent (all migrations are pending)\n'
+  fi
+  for migration in "${migrations[@]}"; do
+    version="$(basename "$migration")"
+    if [[ -z "$schema_table" ]]; then
+      printf 'pending %s\n' "$version"
+      pending_count=$((pending_count + 1))
+      continue
+    fi
+
+    applied="$(psql_exec -Atqc \
+      "SELECT 1 FROM schema_migrations WHERE version = '$version' LIMIT 1")"
+    if [[ "$applied" == "1" ]]; then
+      printf 'already applied %s\n' "$version"
+      applied_count=$((applied_count + 1))
+    else
+      printf 'pending %s\n' "$version"
+      pending_count=$((pending_count + 1))
+    fi
+  done
+  printf 'Migration dry-run summary: applied=%d pending=%d total=%d\n' "$applied_count" "$pending_count" "${#migrations[@]}"
+  exit 0
+fi
+
+psql_exec -c '
+  CREATE TABLE IF NOT EXISTS schema_migrations (
+    version TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+'
+
+for migration in "${migrations[@]}"; do
+  version="$(basename "$migration")"
   applied="$(psql_exec -Atqc \
     "SELECT 1 FROM schema_migrations WHERE version = '$version' LIMIT 1")"
 

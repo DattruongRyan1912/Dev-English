@@ -1,0 +1,2924 @@
+{
+  "schema": "devenglish-file-cone@1",
+  "base": "104304f12f411dd534aa4b385e964b3b8c11ae43",
+  "worktree": "integration/final-v1",
+  "purpose": "Cumulative final-v1 candidate provenance; every non-ignored change is assigned to an implementation or integration cone.",
+  "paths": [
+    {
+      "path": ".agents/mcp_config.json",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".agents/rules/cyberos.md",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".claude/skills/gitnexus/gitnexus-cli/SKILL.md",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".claude/skills/gitnexus/gitnexus-debugging/SKILL.md",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".claude/skills/gitnexus/gitnexus-exploring/SKILL.md",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".claude/skills/gitnexus/gitnexus-guide/SKILL.md",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".claude/skills/gitnexus/gitnexus-impact-analysis/SKILL.md",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".claude/skills/gitnexus/gitnexus-refactoring/SKILL.md",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".codex/config.toml",
+      "owners": [
+        "INTEGRATION-AGENT-SURFACE"
+      ]
+    },
+    {
+      "path": ".env.example",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "owners": [
+        "INTEGRATION-CI"
+      ]
+    },
+    {
+      "path": ".github/workflows/postgres-integrations.yml",
+      "owners": [
+        "INTEGRATION-CI"
+      ]
+    },
+    {
+      "path": ".gitignore",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": ".mcp.json",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": ".metadata",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "AGENTS.md",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "CLAUDE.md",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "Dockerfile.web",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "GEMINI.md",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "Makefile",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "README.md",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/.gitignore",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/build.gradle.kts",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/debug/AndroidManifest.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/AndroidManifest.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/kotlin/com/devenglish/devenglish/MainActivity.kt",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/drawable-v21/launch_background.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/drawable/launch_background.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/values-night/styles.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/values/styles.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/main/res/xml/network_security_config.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/app/src/profile/AndroidManifest.xml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/build.gradle.kts",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/gradle.properties",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/gradle/wrapper/gradle-wrapper.properties",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "android/settings.gradle.kts",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/cmd/server/main.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/actions/service.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/actions/service_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/ai/provider.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/ai/provider_http_test.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/ai/provider_test.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/ai/speech.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/application/application.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/application_remaining_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/application_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/conversations_memory.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/conversations_postgres.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/coverage_contract_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/factory.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/factory_boundary_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/grounded_generator.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/grounded_generator_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/postgres_integration_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/application/workspace_resolution_integration_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/assistant/grounding_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/assistant/types.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/contracts.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/contracts_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/coverage_edges_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/errors.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/failure_paths_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/fakes.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/fakes_boundary_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/helper_boundaries_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/postgres_boundaries_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/postgres_integrity_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/postgres_safe_write.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/postgres_store.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/postgres_store_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/pure_boundaries_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/safe_write.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/safe_write_boundaries_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/safe_write_service_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/sync.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/connectors/sync_service_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/contracts/v1.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/contracts/v1_test.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/domain/models.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/actions.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/actions_continuation_boundary_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/actions_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/connectors_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/legacy_boundary_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/missing_dependency_boundary_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/server.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/server_continuation_boundary_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/server_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/v2.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/v2_boundary_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/v2_continuation_boundary_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/v2_contract_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/v2_error_contract_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/v2_isolation_and_connector_boundary_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/httpapi/v2_scope_failure_test.go",
+      "owners": [
+        "TASK-007"
+      ]
+    },
+    {
+      "path": "backend/internal/integrations/connectors_read_test.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/integrations/github.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/integrations/google_drive.go",
+      "owners": [
+        "TASK-005"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/embedding.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/embedding_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/coverage_contract_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/errors.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/memory.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/memory_boundary_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/memory_repository_contract_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/postgres.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/postgres_repository_integration_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/postgres_unit_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/repository.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/service.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/service_boundary_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/service_read_contract_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/source_detail_test.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/knowledge/types.go",
+      "owners": [
+        "TASK-003"
+      ]
+    },
+    {
+      "path": "backend/internal/learning/features.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/learning/features_test.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/learning/service.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/learningoverlay/postgres_integration_test.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/learningoverlay/service.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/learningoverlay/service_test.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/application.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/application_boundary_extra_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/application_full_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/application_input_boundary_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/application_product_boundary_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/application_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/auth.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/errors.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/mcp_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/official_sdk_conformance_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/postgres_tokens.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/postgres_tokens_integration_test.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/mcp/protocol.go",
+      "owners": [
+        "TASK-007A"
+      ]
+    },
+    {
+      "path": "backend/internal/platform/builtins.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/platform/errors.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/platform/manifest.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/platform/module.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/platform/platform_test.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/platform/registry.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/store/memory.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/store/postgres.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/store/postgres_integration_test.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/store/repository.go",
+      "owners": [
+        "TASK-002"
+      ]
+    },
+    {
+      "path": "backend/internal/testkit/postgres.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/testkit/postgres_test.go",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "backend/internal/usageguard/service.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/usageguard/service_test.go",
+      "owners": [
+        "TASK-006"
+      ]
+    },
+    {
+      "path": "backend/internal/work/memory.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "backend/internal/work/memory_boundary_test.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "backend/internal/work/postgres.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "backend/internal/work/postgres_boundary_integration_test.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "backend/internal/work/postgres_error_mapping_test.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "backend/internal/work/postgres_error_test.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "backend/internal/work/postgres_repository_integration_test.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "backend/internal/work/service_boundary_test.go",
+      "owners": [
+        "TASK-004"
+      ]
+    },
+    {
+      "path": "changelog.md",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/status-feed.json",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-CYB-001.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-OPS-001.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-001.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-002.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-003.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-004.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-005.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-006.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-007.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/data/task/TASK-PRODUCT-008.js",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/roadmap.html",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "dist/website/reference/status.html",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "docs/project/DECISIONS.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/MCP_CLIENT_SETUP.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/MULTI_AGENT_PROTOCOL.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/PRODUCTION_RUNBOOK.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/RC1_EVIDENCE.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/README.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/REBUILD_PLAN.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ROADMAP.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/STATUS.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/TEST_LOG.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-acceptance-audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-acceptance-final.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-acceptance-refresh.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-drive-oauth-context-cancellation.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-drive-oauth-refresh.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-drive-oauth-timeout.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-feature-ownership-refactor.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-grounded-assistant-context.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-http-boundary-and-coverage-refresh.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-legacy-upgrade-harness-018.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-mcp-streamable-http-hardening.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-migration-dry-run.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-module-manifest-runtime.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-product-ac-completion-matrix.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-product-task-audit-backfill.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-r0-baseline.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-tailscale-apk-helper.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-task-traceability-repair.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-today-quick-capture.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-usage-accounting-hardening.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-wave3-navigation-regression-guard.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-29-workspace-resolution-guard.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-bootstrap-capability-state.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-continuation-reconciliation.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-current-source-gates.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-cyberos-gates.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-cyberos-wip-rebaseline.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-keyboard-accessibility.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-knowledge-import-mutation-boundary.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-self-contained-s7-gates.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-sol-review-usage-limit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-30-ui-header-and-current-gates.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/2026-08-31-final-v1-four-finding-repair.md",
+      "owners": [
+        "INTEGRATION-REVIEW"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/20260830-final-v1-file-cone.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/20260830-final-v1-preservation.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/PRODUCT-RESET-IMPLEMENTATION-20260828.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-INTEGRATION-R7.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-REPAIR-R3.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-REPAIR-R4.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-REVIEW-R10.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-REVIEW-R2.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-REVIEW-R5.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-REVIEW-R6.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2-REVIEW-R8.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-2.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-PLANNING-ATTENTION.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-10.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-11.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-12.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-13.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-14.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-2.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-3.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-4.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-5.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-6-ATTENTION.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-7.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-8.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-REVIEW-9.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-006.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-007.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-008-R1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-008-R2.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-008.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-008A-R1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-008A-R2.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-008A-R3.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3-TASK-008A.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-3.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-ARTIFACT-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-CI-ARTIFACT-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-CI-RECOVERY-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-CI-UPGRADE-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-COMPAT-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-HOSTED-FLUTTER-R1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-RECOVERY-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009-UPGRADE-1.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4-TASK-009.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/agent-runs/WAVE-4.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/coverage/2026-08-29-r0-backend-coverage-baseline.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/mcp/codex-product-mcp.toml.example",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/FINAL-V1-INTEGRATION-REPORT.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/PRODUCT-RESET-IMPLEMENTATION-REPORT.html",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/S1-WALKING-SKELETON-REPORT.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/WAVE-2-DELIVERY-REPORT.html",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/knowledge-mobile.jpg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/learning-mobile.jpg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/practice-mobile.jpg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/today-chat-mobile.jpg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/today-mobile.jpg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/today-mobile.png",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/work-mobile.jpg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/reports/assets/writing-mobile.jpg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/HIGH_FIDELITY_SPEC.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/OPERATOR_VERDICT.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/PROTOTYPE.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/README.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/SCREENSHOT_AUDIT.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/TOKEN_SHEET.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/USER_FLOW_MAP.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/project/ux/WIREFRAMES.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/assets/favicon.svg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/assets/status.css",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/assets/status.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/status-feed.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-CYB-001.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-OPS-001.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-001.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-002.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-003.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-004.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-005.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-006.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-007.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/data/task/TASK-PRODUCT-008.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/index.html",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/assets/favicon.svg",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/assets/status.css",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/assets/status.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/status-feed.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-CYB-001.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-OPS-001.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-001.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-002.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-003.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-004.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-005.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-006.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-007.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/data/task/TASK-PRODUCT-008.js",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/roadmap.html",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/reference/status.html",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/status/roadmap.html",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/.workflow/.gitignore",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/BACKLOG.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/_state/receipts/TASK-CYB-001--draft--ready_to_implement--964513f6e942.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/_state/receipts/TASK-CYB-001--implementing--ready_to_review--fe9db5074304.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/_state/receipts/TASK-CYB-001--ready_to_implement--implementing--f7fff3ed3e1b.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/_state/receipts/TASK-CYB-001--ready_to_review--reviewing--e355dd99d73d.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/_state/receipts/TASK-CYB-001--ready_to_test--testing--11b949a3d1b5.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/_state/receipts/TASK-CYB-001--reviewing--ready_to_test--e7ee4d880200.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/_verdicts/TASK-CYB-001--reviewing--ready_to_test--b57638e079e7.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/cyberos/TASK-CYB-001-cyberos-only-workflow/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/cyberos/TASK-CYB-001-cyberos-only-workflow/implementation.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/cyberos/TASK-CYB-001-cyberos-only-workflow/review-findings.json",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/cyberos/TASK-CYB-001-cyberos-only-workflow/review.audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/cyberos/TASK-CYB-001-cyberos-only-workflow/review.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/cyberos/TASK-CYB-001-cyberos-only-workflow/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/improvement/TASK-OPS-001-agent-orchestration-loop-guard/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/improvement/TASK-OPS-001-agent-orchestration-loop-guard/context-map.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/improvement/TASK-OPS-001-agent-orchestration-loop-guard/edge-case-matrix.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/improvement/TASK-OPS-001-agent-orchestration-loop-guard/impl-plan.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/improvement/TASK-OPS-001-agent-orchestration-loop-guard/implementation.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/improvement/TASK-OPS-001-agent-orchestration-loop-guard/obs-injection.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/improvement/TASK-OPS-001-agent-orchestration-loop-guard/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-001-ux-lock/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-001-ux-lock/context-map.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-001-ux-lock/edge-case-matrix.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-001-ux-lock/impl-plan.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-001-ux-lock/obs-injection.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-001-ux-lock/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-002-walking-skeleton/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-002-walking-skeleton/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-003-work-depth/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-003-work-depth/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-004-knowledge-sync/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-004-knowledge-sync/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-005-grounded-assistant/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-005-grounded-assistant/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-006-learning-voice/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-006-learning-voice/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-007-mcp-parity/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-007-mcp-parity/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-008-cutover-hardening/audit.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "docs/tasks/product/TASK-PRODUCT-008-cutover-hardening/spec.md",
+      "owners": [
+        "INTEGRATION-DOCS"
+      ]
+    },
+    {
+      "path": "go.mod",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "go.sum",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "infra/Caddyfile.web",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/Dockerfile.vps",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/docker-compose.production.smoke.yml",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/docker-compose.production.yml",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/docker-compose.vps.yml",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/docker-compose.yml",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/embedding/Dockerfile",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/embedding/app.py",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/embedding/requirements.txt",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "infra/migrations/007_assistant_s1.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/008_knowledge_root_fks.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/009_knowledge_evidence_trigger_repair.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/010_connector_sync.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/011_usage_accounting.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/012_action_receipt_hash.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/013_learning_overlay.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/014_workspace_backfill.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/015_usage_reservations.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/016_mcp_tokens.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/017_workspace_scoped_challenge_identity.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/018_assistant_conversation_context.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/migrations/019_platform_constraint_repair.sql",
+      "owners": [
+        "INTEGRATION-MIGRATION"
+      ]
+    },
+    {
+      "path": "infra/production.env.example",
+      "owners": [
+        "INTEGRATION-RUNTIME"
+      ]
+    },
+    {
+      "path": "lib/main.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/api.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/app/workspace_shell.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/app_controller.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/components.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/data/workspace_api.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/demo_data.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/design_system/index.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/assistant/assistant_surface.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/assistant/workspace_assistant.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/knowledge/knowledge_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/knowledge/workspace_knowledge.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/learning/learning_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/learning/workspace_learning.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/today/today_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/today/workspace_today.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/work/work_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/work/workspace_work.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/workspace/workspace.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/workspace/workspace_details.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/workspace/workspace_dialogs_actions.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/workspace/workspace_dialogs_import.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/workspace/workspace_dialogs_work.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/features/workspace/workspace_shared.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/learning_overlay_copy.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/legacy_learning_gate.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/models.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/screens/diagnostic_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/screens/roleplay_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/screens/settings_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/screens/speaking_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/screens/workspace_screen.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/theme.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/v1_contracts.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/workspace_api.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/workspace_controller.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "lib/src/workspace_models.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "pubspec.lock",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "pubspec.yaml",
+      "owners": [
+        "INTEGRATION"
+      ]
+    },
+    {
+      "path": "scripts/android_emulator_smoke.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/android_local_apk.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/android_local_apk_test.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/backend_coverage_gate.mjs",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/backend_coverage_gate_test.mjs",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/db_backup_restore_test.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/db_legacy_upgrade_test.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/db_migrate.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/db_migrate_test.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/knowledge_capacity_test.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/production_example_test.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/production_runtime_smoke.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/verify_cyberos_only.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "scripts/verify_multi_agent_protocol.sh",
+      "owners": [
+        "INTEGRATION-GATES"
+      ]
+    },
+    {
+      "path": "test/api_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/browser_smoke_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_1440x900_assistant.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_1440x900_knowledge.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_1440x900_learning.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_1440x900_today.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_1440x900_work.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_390x844_assistant.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_390x844_knowledge.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_390x844_learning.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_390x844_today.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_390x844_work.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_430x932_assistant.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_430x932_knowledge.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_430x932_learning.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_430x932_today.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_430x932_work.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_state_390x844_conflict.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_state_390x844_empty.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_state_390x844_loading.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_state_390x844_offline.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_state_390x844_provider-error.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_state_390x844_stale-degraded.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/goldens/workspace_state_390x844_sync.png",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/learning_overlay_copy_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/production_shell_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/roleplay_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/roleplay_voice_learning_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/v1_contracts_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/widget_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/workspace_api_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/workspace_golden_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/workspace_state_golden_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/workspace_ui_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "test/workspace_voice_learning_test.dart",
+      "owners": [
+        "TASK-008",
+        "TASK-008A"
+      ]
+    },
+    {
+      "path": "web/index.html",
+      "owners": [
+        "INTEGRATION"
+      ]
+    }
+  ]
+}

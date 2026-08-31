@@ -99,7 +99,7 @@ func (r *MemoryRepository) GetProject(_ context.Context, scope Scope, id string)
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	project, ok := r.projects[entityKey(scope, id)]
-	if !ok || !projectInScope(project.WorkspaceID, project.OwnerUserID, scope) {
+	if !ok || !projectInScope(project.WorkspaceID, project.OwnerUserID, scope) || project.DeletedAt != nil {
 		return Project{}, notFound(EntityProject, id)
 	}
 	return cloneProject(project), nil
@@ -332,7 +332,7 @@ func (r *MemoryRepository) GetTask(_ context.Context, scope Scope, id string) (T
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	task, ok := r.tasks[entityKey(scope, id)]
-	if !ok || !projectInScope(task.WorkspaceID, task.OwnerUserID, scope) {
+	if !ok || !projectInScope(task.WorkspaceID, task.OwnerUserID, scope) || task.DeletedAt != nil {
 		return Task{}, notFound(EntityTask, id)
 	}
 	return cloneTask(task), nil
@@ -582,7 +582,7 @@ func (r *MemoryRepository) GetDecision(_ context.Context, scope Scope, id string
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	decision, ok := r.decisions[entityKey(scope, id)]
-	if !ok || !projectInScope(decision.WorkspaceID, decision.OwnerUserID, scope) {
+	if !ok || !projectInScope(decision.WorkspaceID, decision.OwnerUserID, scope) || decision.DeletedAt != nil {
 		return Decision{}, notFound(EntityDecision, id)
 	}
 	return cloneDecision(decision), nil
