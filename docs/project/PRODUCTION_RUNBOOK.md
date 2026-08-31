@@ -7,6 +7,7 @@ This runbook is the deployment boundary for the RC1 Docker topology. It is inten
 - Caddy serves the production Flutter web bundle, terminates HTTPS and proxies `/api/*`, `/healthz` and `/readyz` to the backend.
 - The Go backend runs with `DEVENGLISH_ENV=production`, PostgreSQL/pgvector and no deterministic fallback or demo state.
 - PostgreSQL is private to the Compose network and is migrated explicitly before the backend is exposed.
+- Production Compose does not mount SQL files into `docker-entrypoint-initdb.d`; every production migration runs through `scripts/db_migrate.sh`.
 - Caddy and the backend write structured logs to container stdout; the host must forward and retain them according to its operations policy.
 
 ## Required operator inputs
@@ -24,16 +25,29 @@ From the repository root on the production host:
 
 ```bash
 cp infra/production.env.example .env.production
-# Edit .env.production. URL-encode the PostgreSQL password inside DATABASE_URL.
+# Edit .env.production, replace every CHANGE_ME marker, and URL-encode the PostgreSQL password inside DATABASE_URL.
 chmod 600 .env.production
 
 docker compose --env-file .env.production \
   -f infra/docker-compose.production.yml config --quiet
 
 docker compose --env-file .env.production \
-  -f infra/docker-compose.production.yml up -d postgres
+  -f infra/docker-compose.production.yml up -d --wait postgres
+
+docker compose --env-file .env.production \
+  -f infra/docker-compose.production.yml exec -T postgres \
+  pg_isready -U devenglish -d devenglish
 
 # Replace the values below if POSTGRES_USER/POSTGRES_DB were customized.
+COMPOSE_FILE=infra/docker-compose.production.yml \
+ENV_FILE=.env.production \
+POSTGRES_SERVICE=postgres \
+POSTGRES_USER=devenglish \
+POSTGRES_DB=devenglish \
+DRY_RUN=YES \
+./scripts/db_migrate.sh
+
+# Review the pending/applied report above, then apply the exact same migration set.
 COMPOSE_FILE=infra/docker-compose.production.yml \
 ENV_FILE=.env.production \
 POSTGRES_SERVICE=postgres \
@@ -45,7 +59,24 @@ docker compose --env-file .env.production \
   -f infra/docker-compose.production.yml up -d --build backend web
 ```
 
+The `--wait` flag blocks until PostgreSQL passes its healthcheck, and the explicit `pg_isready` check above confirms the same target is accepting connections before migration. Do not start the backend before the migration runner completes. A fresh production volume is intentionally empty until the explicit runner command above applies the ordered migrations.
+
 The first startup of Caddy may take a short time while it obtains the certificate. Do not call the deployment production-ready until DNS and certificate issuance have been verified from outside the host.
+
+Before a production deployment, exercise the same runner against a disposable fresh PostgreSQL volume. The check verifies first application, idempotent re-application and rollback of a failing migration:
+
+```bash
+export COMPOSE_PROJECT_NAME=devenglish-migration-check
+docker compose -f infra/docker-compose.ci.yml up -d --wait postgres
+COMPOSE_FILE=infra/docker-compose.ci.yml \
+COMPOSE_PROJECT_NAME="$COMPOSE_PROJECT_NAME" \
+POSTGRES_SERVICE=postgres \
+POSTGRES_USER=devenglish \
+POSTGRES_DB=devenglish \
+./scripts/db_migrate_test.sh
+docker compose -f infra/docker-compose.ci.yml down -v
+unset COMPOSE_PROJECT_NAME
+```
 
 ## Readiness and smoke checks
 

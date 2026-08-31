@@ -17,9 +17,10 @@ const (
 	SafeWriteOperationCreateIssue SafeWriteOperation = "github.issue.create"
 	SafeWriteOperationAddComment  SafeWriteOperation = "github.issue.comment"
 	SafeWriteOperationSetLabels   SafeWriteOperation = "github.issue.labels"
+	SafeWriteOperationEntityTrash SafeWriteOperation = "work.entity.trash"
+	SafeWriteOperationEntityPurge SafeWriteOperation = "work.entity.purge"
 	SafeWriteChallengeTTL                            = 5 * time.Minute
 	SafeWriteReceiptPending                          = "pending"
-	SafeWriteReceiptUncertain                        = "uncertain"
 	SafeWriteReceiptAccepted                         = "accepted"
 )
 
@@ -29,6 +30,9 @@ type SafeWriteOperation string
 // It intentionally contains no credentials or provider response body.
 type SafeWriteTarget struct {
 	Operation        SafeWriteOperation
+	EntityType       string
+	EntityID         string
+	ExpectedVersion  int64
 	Repository       string
 	Issue            int64
 	Title            string
@@ -38,6 +42,21 @@ type SafeWriteTarget struct {
 }
 
 func (t SafeWriteTarget) Validate() error {
+	if t.Operation == SafeWriteOperationEntityTrash || t.Operation == SafeWriteOperationEntityPurge {
+		if !validSafeWriteIdentifier(t.EntityType, 32) || (t.EntityType != "project" && t.EntityType != "task" && t.EntityType != "decision") {
+			return ErrInvalidWriteTarget
+		}
+		if !validSafeWriteIdentifier(t.EntityID, 256) || t.ExpectedVersion < 1 {
+			return ErrInvalidWriteTarget
+		}
+		if strings.TrimSpace(t.Repository) != "" || t.Issue != 0 || strings.TrimSpace(t.Title) != "" || strings.TrimSpace(t.Body) != "" || len(t.Labels) != 0 || strings.TrimSpace(t.ExpectedRevision) != "" {
+			return ErrInvalidWriteTarget
+		}
+		return nil
+	}
+	if t.EntityType != "" || t.EntityID != "" || t.ExpectedVersion != 0 {
+		return ErrInvalidWriteTarget
+	}
 	if normalizeRepository(t.Repository) == "" {
 		return ErrInvalidRepository
 	}
@@ -73,6 +92,9 @@ func (t SafeWriteTarget) normalizedLabels() []string {
 }
 
 func (t SafeWriteTarget) TargetTypeAndID() (string, string) {
+	if t.Operation == SafeWriteOperationEntityTrash || t.Operation == SafeWriteOperationEntityPurge {
+		return "work_" + strings.TrimSpace(t.EntityType), strings.TrimSpace(t.EntityID)
+	}
 	if t.Operation == SafeWriteOperationCreateIssue {
 		return "github_repository", normalizeRepository(t.Repository)
 	}
@@ -87,6 +109,9 @@ func (t SafeWriteTarget) ActionHash() (string, error) {
 	}
 	canonical := struct {
 		Operation        SafeWriteOperation `json:"operation"`
+		EntityType       string             `json:"entityType,omitempty"`
+		EntityID         string             `json:"entityId,omitempty"`
+		ExpectedVersion  int64              `json:"expectedVersion,omitempty"`
 		Repository       string             `json:"repository"`
 		Issue            int64              `json:"issue,omitempty"`
 		Title            string             `json:"title,omitempty"`
@@ -95,6 +120,9 @@ func (t SafeWriteTarget) ActionHash() (string, error) {
 		ExpectedRevision string             `json:"expectedRevision,omitempty"`
 	}{
 		Operation:        t.Operation,
+		EntityType:       strings.TrimSpace(t.EntityType),
+		EntityID:         strings.TrimSpace(t.EntityID),
+		ExpectedVersion:  t.ExpectedVersion,
 		Repository:       normalizeRepository(t.Repository),
 		Issue:            t.Issue,
 		Title:            t.Title,
@@ -108,6 +136,21 @@ func (t SafeWriteTarget) ActionHash() (string, error) {
 	}
 	digest := sha256.Sum256(payload)
 	return hex.EncodeToString(digest[:]), nil
+}
+
+// ProviderForSafeWriteOperation maps a canonical action operation to the
+// provider family that owns its receipt. The mapping is intentionally small;
+// adding a new provider requires a new operation and explicit handler.
+func ProviderForSafeWriteOperation(operation SafeWriteOperation) string {
+	if operation == SafeWriteOperationEntityTrash || operation == SafeWriteOperationEntityPurge {
+		return ProviderWork
+	}
+	return ProviderGitHub
+}
+
+func validSafeWriteIdentifier(value string, limit int) bool {
+	trimmed := strings.TrimSpace(value)
+	return trimmed != "" && trimmed == value && len(trimmed) <= limit && strings.IndexFunc(trimmed, func(r rune) bool { return r < 0x20 || r == 0x7f || r == ' ' }) < 0
 }
 
 func (r CreateIssueRequest) Validate() error {
@@ -178,13 +221,20 @@ type SafeWriteChallenge struct {
 	UsedAt      *time.Time
 }
 
-func NewSafeWriteChallenge(id, workspaceID, userID string, target SafeWriteTarget, now time.Time) (SafeWriteChallenge, error) {
+func NewSafeWriteChallenge(id, userID string, target SafeWriteTarget, now time.Time) (SafeWriteChallenge, error) {
+	return NewWorkspaceSafeWriteChallenge("", id, userID, target, now)
+}
+
+// NewWorkspaceSafeWriteChallenge is the application-facing constructor. The
+// legacy constructor remains available for low-level fixtures, while real
+// application actions must bind the challenge to a workspace as well as a
+// user and action hash.
+func NewWorkspaceSafeWriteChallenge(workspaceID, id, userID string, target SafeWriteTarget, now time.Time) (SafeWriteChallenge, error) {
 	hash, err := target.ActionHash()
 	if err != nil {
 		return SafeWriteChallenge{}, err
 	}
 	targetType, targetID := target.TargetTypeAndID()
-	createdAt := now.UTC()
 	challenge := SafeWriteChallenge{
 		ID:          strings.TrimSpace(id),
 		WorkspaceID: strings.TrimSpace(workspaceID),
@@ -192,8 +242,8 @@ func NewSafeWriteChallenge(id, workspaceID, userID string, target SafeWriteTarge
 		TargetType:  targetType,
 		TargetID:    targetID,
 		ActionHash:  hash,
-		CreatedAt:   createdAt,
-		ExpiresAt:   createdAt.Add(SafeWriteChallengeTTL),
+		CreatedAt:   now.UTC(),
+		ExpiresAt:   now.UTC().Add(SafeWriteChallengeTTL),
 	}
 	if err := challenge.Validate(now); err != nil {
 		return SafeWriteChallenge{}, err
@@ -202,7 +252,10 @@ func NewSafeWriteChallenge(id, workspaceID, userID string, target SafeWriteTarge
 }
 
 func (c SafeWriteChallenge) Validate(now time.Time) error {
-	if strings.TrimSpace(c.ID) == "" || strings.TrimSpace(c.WorkspaceID) == "" || strings.TrimSpace(c.UserID) == "" || strings.TrimSpace(c.TargetType) == "" || strings.TrimSpace(c.TargetID) == "" || strings.TrimSpace(c.ActionHash) == "" {
+	if strings.TrimSpace(c.ID) == "" || strings.TrimSpace(c.UserID) == "" || strings.TrimSpace(c.TargetType) == "" || strings.TrimSpace(c.TargetID) == "" || strings.TrimSpace(c.ActionHash) == "" {
+		return ErrInvalidChallenge
+	}
+	if c.WorkspaceID != "" && strings.IndexFunc(c.WorkspaceID, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
 		return ErrInvalidChallenge
 	}
 	if c.CreatedAt.IsZero() || c.ExpiresAt.IsZero() || !c.ExpiresAt.After(c.CreatedAt) || c.ExpiresAt.Sub(c.CreatedAt) > SafeWriteChallengeTTL {
@@ -232,15 +285,23 @@ type SafeWriteChallengeStore interface {
 	Consume(ctx context.Context, metadata SafeWriteMetadata, target SafeWriteTarget, now time.Time) error
 }
 
+// SafeWriteChallengeIssuer and SafeWriteChallengeReader are deliberately
+// separate from Consume. The application issues a preview first, then reads
+// and validates the canonical challenge identity before confirming it.
+type SafeWriteChallengeIssuer interface {
+	Put(challenge SafeWriteChallenge) error
+}
+
+type SafeWriteChallengeReader interface {
+	Get(ctx context.Context, workspaceID, userID, challengeID string) (SafeWriteChallenge, error)
+}
+
 func (m SafeWriteMetadata) ValidateConfirmation(now time.Time, target SafeWriteTarget) error {
 	if strings.TrimSpace(m.UserID) == "" {
 		return ErrMissingUserID
 	}
 	if strings.TrimSpace(m.ChallengeID) == "" || strings.TrimSpace(m.ActionHash) == "" {
 		return ErrMissingChallenge
-	}
-	if strings.TrimSpace(m.WorkspaceID) == "" {
-		return ErrInvalidWorkspaceID
 	}
 	expectedHash, err := target.ActionHash()
 	if err != nil {
@@ -257,9 +318,9 @@ func (m SafeWriteMetadata) ValidateConfirmation(now time.Time, target SafeWriteT
 
 type SafeWriteReceipt struct {
 	ID             string
+	WorkspaceID    string
 	Provider       string
 	Operation      SafeWriteOperation
-	WorkspaceID    string
 	UserID         string
 	ChallengeID    string
 	IdempotencyKey string
@@ -275,16 +336,23 @@ type SafeWriteReceipt struct {
 
 type SafeWriteReceiptStore interface {
 	Lookup(ctx context.Context, workspaceID, userID string, operation SafeWriteOperation, idempotencyKey string) (SafeWriteReceipt, bool, error)
-	// Reserve atomically records a pending receipt before an external mutation.
-	// The bool is true when an existing receipt owns the same idempotency key.
-	Reserve(ctx context.Context, receipt SafeWriteReceipt) (SafeWriteReceipt, bool, error)
+	// Save remains available for low-level compatibility. New guarded writes
+	// use SafeWriteReservationStore so a durable pending row exists before the
+	// provider is called.
 	Save(ctx context.Context, receipt SafeWriteReceipt) error
 }
 
+// SafeWriteReservationStore is the durable two-phase receipt boundary used by
+// the production guarded writer. Reserve must be atomic on the idempotency
+// identity and Complete must only transition the same pending reservation.
+type SafeWriteReservationStore interface {
+	Reserve(ctx context.Context, receipt SafeWriteReceipt) (SafeWriteReceipt, bool, error)
+	Complete(ctx context.Context, receipt SafeWriteReceipt) error
+}
+
 type GitHubWriteOutcome struct {
-	Receipt   SafeWriteReceipt
-	Replayed  bool
-	Uncertain bool
+	Receipt  SafeWriteReceipt
+	Replayed bool
 }
 
 // GitHubSafeWriteService is the guarded facade over the low-level V1 writer.
@@ -309,7 +377,6 @@ func (s *GitHubSafeWriteService) CreateIssue(ctx context.Context, request Create
 	if err := request.Validate(); err != nil {
 		return GitHubWriteOutcome{}, err
 	}
-	request.Metadata = normalizeMetadata(request.Metadata)
 	target := request.Target()
 	return s.execute(ctx, target, request.Metadata, func() (SafeWriteReceipt, error) {
 		issue, err := s.Writer.CreateIssue(ctx, request)
@@ -327,7 +394,6 @@ func (s *GitHubSafeWriteService) AddIssueComment(ctx context.Context, request Co
 	if err := request.Validate(); err != nil {
 		return GitHubWriteOutcome{}, err
 	}
-	request.Metadata = normalizeMetadata(request.Metadata)
 	target := request.Target()
 	return s.execute(ctx, target, request.Metadata, func() (SafeWriteReceipt, error) {
 		comment, err := s.Writer.AddIssueComment(ctx, request)
@@ -345,7 +411,6 @@ func (s *GitHubSafeWriteService) SetIssueLabels(ctx context.Context, request Lab
 	if err := request.Validate(); err != nil {
 		return GitHubWriteOutcome{}, err
 	}
-	request.Metadata = normalizeMetadata(request.Metadata)
 	target := request.Target()
 	return s.execute(ctx, target, request.Metadata, func() (SafeWriteReceipt, error) {
 		labels, err := s.Writer.SetIssueLabels(ctx, request)
@@ -360,9 +425,11 @@ func (s *GitHubSafeWriteService) SetIssueLabels(ctx context.Context, request Lab
 }
 
 func (s *GitHubSafeWriteService) execute(ctx context.Context, target SafeWriteTarget, metadata SafeWriteMetadata, invoke func() (SafeWriteReceipt, error)) (GitHubWriteOutcome, error) {
-	if s == nil || s.Writer == nil || s.Challenges == nil || s.Receipts == nil {
-		return GitHubWriteOutcome{}, errors.New("GitHub writer, challenge store and receipt store are required")
-	}
+	// The process mutex is only a local optimization. The reservation store is
+	// the durable multi-instance boundary and must be created before provider
+	// I/O, so a lost response cannot cause a second external mutation on retry.
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err := metadata.Validate(); err != nil {
 		return GitHubWriteOutcome{}, err
 	}
@@ -373,37 +440,50 @@ func (s *GitHubSafeWriteService) execute(ctx context.Context, target SafeWriteTa
 	if err != nil {
 		return GitHubWriteOutcome{}, err
 	}
-	metadata = normalizeMetadata(metadata)
 	clock := s.Clock
 	if clock == nil {
 		clock = time.Now
 	}
 	now := clock().UTC()
-
-	// The process-local lock keeps same-instance calls deterministic. Reserve is
-	// still required because separate service instances must share the durable
-	// idempotency boundary before either one invokes the provider.
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	previous, found, lookupErr := s.Receipts.Lookup(ctx, metadata.WorkspaceID, metadata.UserID, target.Operation, metadata.IdempotencyKey)
 	if lookupErr != nil {
 		return GitHubWriteOutcome{}, wrapConnectorFailure(ProviderGitHub, "lookup write receipt", lookupErr)
 	}
 	if found {
-		return existingReceiptOutcome(previous, metadata, target, hash)
+		if previous.ActionHash != hash || previous.TargetType != targetType(target) || previous.TargetID != targetID(target) {
+			return GitHubWriteOutcome{}, ErrIdempotencyConflict
+		}
+		if previous.Status == SafeWriteReceiptPending {
+			return GitHubWriteOutcome{Receipt: previous}, fmt.Errorf("%w: %s", ErrReceiptUncertain, previous.ID)
+		}
+		if previous.Status != SafeWriteReceiptAccepted {
+			return GitHubWriteOutcome{Receipt: previous}, fmt.Errorf("%w: %s", ErrReceiptUncertain, previous.ID)
+		}
+		return GitHubWriteOutcome{Receipt: previous, Replayed: true}, nil
 	}
 	if err := metadata.ValidateConfirmation(now, target); err != nil {
 		return GitHubWriteOutcome{}, err
 	}
-	if err := s.Challenges.Consume(ctx, metadata, target, now); err != nil {
-		return GitHubWriteOutcome{}, err
+	if reader, ok := s.Challenges.(SafeWriteChallengeReader); ok {
+		challenge, readErr := reader.Get(ctx, metadata.WorkspaceID, metadata.UserID, metadata.ChallengeID)
+		if readErr != nil {
+			return GitHubWriteOutcome{}, readErr
+		}
+		if err := challenge.Validate(now); err != nil {
+			return GitHubWriteOutcome{}, err
+		}
+		challengeType, challengeID := challenge.TargetType, challenge.TargetID
+		if challenge.WorkspaceID != metadata.WorkspaceID || challenge.UserID != metadata.UserID ||
+			challenge.ID != metadata.ChallengeID || challenge.ActionHash != metadata.ActionHash ||
+			challengeType != targetType(target) || challengeID != targetID(target) {
+			return GitHubWriteOutcome{}, ErrInvalidChallenge
+		}
 	}
-	reservation := SafeWriteReceipt{
+	pending := SafeWriteReceipt{
 		ID:             deterministicReceiptID(metadata.WorkspaceID, metadata.UserID, target.Operation, metadata.IdempotencyKey, hash),
 		Provider:       ProviderGitHub,
-		Operation:      target.Operation,
 		WorkspaceID:    metadata.WorkspaceID,
+		Operation:      target.Operation,
 		UserID:         metadata.UserID,
 		ChallengeID:    metadata.ChallengeID,
 		IdempotencyKey: metadata.IdempotencyKey,
@@ -413,103 +493,49 @@ func (s *GitHubSafeWriteService) execute(ctx context.Context, target SafeWriteTa
 		Status:         SafeWriteReceiptPending,
 		CreatedAt:      now,
 	}
-	reserved, alreadyReserved, reserveErr := s.Receipts.Reserve(ctx, reservation)
-	if reserveErr != nil {
-		if errors.Is(reserveErr, ErrIdempotencyConflict) {
-			return GitHubWriteOutcome{}, reserveErr
+	reservationStore, durable := s.Receipts.(SafeWriteReservationStore)
+	if durable {
+		reserved, existed, reserveErr := reservationStore.Reserve(ctx, pending)
+		if reserveErr != nil {
+			return GitHubWriteOutcome{}, fmt.Errorf("%w: %s", ErrReceiptPersistence, RedactSecrets(reserveErr.Error()))
 		}
-		return GitHubWriteOutcome{}, fmt.Errorf("%w: %s", ErrReceiptPersistence, RedactSecrets(reserveErr.Error()))
+		if existed {
+			if reserved.ActionHash != hash || reserved.TargetType != pending.TargetType || reserved.TargetID != pending.TargetID {
+				return GitHubWriteOutcome{}, ErrIdempotencyConflict
+			}
+			if reserved.Status == SafeWriteReceiptAccepted {
+				return GitHubWriteOutcome{Receipt: reserved, Replayed: true}, nil
+			}
+			return GitHubWriteOutcome{Receipt: reserved}, fmt.Errorf("%w: %s", ErrReceiptUncertain, reserved.ID)
+		}
 	}
-	if alreadyReserved {
-		return existingReceiptOutcome(reserved, metadata, target, hash)
+	if err := s.Challenges.Consume(ctx, metadata, target, now); err != nil {
+		return GitHubWriteOutcome{}, err
 	}
 	partial, err := invoke()
 	if err != nil {
-		uncertain := reservation
-		uncertain.Status = SafeWriteReceiptUncertain
-		if saveErr := s.Receipts.Save(ctx, uncertain); saveErr != nil {
-			return GitHubWriteOutcome{Receipt: reservation}, fmt.Errorf("%w: %s", ErrReceiptPersistence, RedactSecrets(saveErr.Error()))
+		return GitHubWriteOutcome{}, err
+	}
+	partial.ID = pending.ID
+	partial.Provider = ProviderGitHub
+	partial.WorkspaceID = metadata.WorkspaceID
+	partial.Operation = target.Operation
+	partial.UserID = metadata.UserID
+	partial.ChallengeID = metadata.ChallengeID
+	partial.IdempotencyKey = metadata.IdempotencyKey
+	partial.ActionHash = hash
+	partial.TargetType = targetType(target)
+	partial.TargetID = targetID(target)
+	partial.Status = SafeWriteReceiptAccepted
+	partial.CreatedAt = pending.CreatedAt
+	if durable {
+		if err := reservationStore.Complete(ctx, partial); err != nil {
+			return GitHubWriteOutcome{Receipt: pending}, fmt.Errorf("%w: %s", ErrReceiptUncertain, RedactSecrets(err.Error()))
 		}
-		return GitHubWriteOutcome{Receipt: uncertain, Uncertain: true}, newUncertainWriteError(err)
+	} else if err := s.Receipts.Save(ctx, partial); err != nil {
+		return GitHubWriteOutcome{}, fmt.Errorf("%w: %s", ErrReceiptPersistence, RedactSecrets(err.Error()))
 	}
-	accepted := reservation
-	accepted.Issue = partial.Issue
-	accepted.Comment = partial.Comment
-	accepted.Labels = append([]GitHubLabel(nil), partial.Labels...)
-	accepted.Status = SafeWriteReceiptAccepted
-	if err := s.Receipts.Save(ctx, accepted); err != nil {
-		if errors.Is(err, ErrIdempotencyConflict) {
-			return GitHubWriteOutcome{}, err
-		}
-		uncertain := reservation
-		uncertain.Status = SafeWriteReceiptUncertain
-		if uncertainSaveErr := s.Receipts.Save(ctx, uncertain); uncertainSaveErr == nil {
-			reservation = uncertain
-		}
-		return GitHubWriteOutcome{Receipt: reservation, Uncertain: true}, fmt.Errorf("%w: %s", ErrReceiptPersistence, RedactSecrets(err.Error()))
-	}
-	return GitHubWriteOutcome{Receipt: accepted}, nil
-}
-
-func normalizeMetadata(metadata SafeWriteMetadata) SafeWriteMetadata {
-	metadata.WorkspaceID = strings.TrimSpace(metadata.WorkspaceID)
-	metadata.IdempotencyKey = strings.TrimSpace(metadata.IdempotencyKey)
-	metadata.UserID = strings.TrimSpace(metadata.UserID)
-	metadata.ChallengeID = strings.TrimSpace(metadata.ChallengeID)
-	metadata.ActionHash = strings.ToLower(strings.TrimSpace(metadata.ActionHash))
-	return metadata
-}
-
-func receiptIdentityMatches(receipt SafeWriteReceipt, metadata SafeWriteMetadata, target SafeWriteTarget, hash string) bool {
-	return receipt.WorkspaceID == metadata.WorkspaceID &&
-		receipt.UserID == metadata.UserID &&
-		receipt.Operation == target.Operation &&
-		receipt.IdempotencyKey == metadata.IdempotencyKey &&
-		strings.EqualFold(receipt.ActionHash, hash) &&
-		receipt.TargetType == targetType(target) &&
-		receipt.TargetID == targetID(target)
-}
-
-func existingReceiptOutcome(receipt SafeWriteReceipt, metadata SafeWriteMetadata, target SafeWriteTarget, hash string) (GitHubWriteOutcome, error) {
-	if !receiptIdentityMatches(receipt, metadata, target, hash) {
-		return GitHubWriteOutcome{}, ErrIdempotencyConflict
-	}
-	switch receipt.Status {
-	case SafeWriteReceiptAccepted:
-		return GitHubWriteOutcome{Receipt: receipt, Replayed: true}, nil
-	case SafeWriteReceiptPending:
-		return GitHubWriteOutcome{Receipt: receipt}, ErrWritePending
-	case SafeWriteReceiptUncertain:
-		return GitHubWriteOutcome{Receipt: receipt, Uncertain: true}, ErrWriteUncertain
-	default:
-		return GitHubWriteOutcome{}, fmt.Errorf("%w: invalid safe write receipt status", ErrReceiptPersistence)
-	}
-}
-
-type uncertainWriteError struct {
-	cause error
-}
-
-func newUncertainWriteError(cause error) error {
-	return &uncertainWriteError{cause: cause}
-}
-
-func (e *uncertainWriteError) Error() string {
-	if e == nil || e.cause == nil {
-		return ErrWriteUncertain.Error()
-	}
-	return fmt.Sprintf("%s: %s", ErrWriteUncertain, RedactSecrets(e.cause.Error()))
-}
-
-func (e *uncertainWriteError) Is(target error) bool {
-	return target == ErrWriteUncertain
-}
-
-func (e *uncertainWriteError) Unwrap() error {
-	if e == nil {
-		return nil
-	}
-	return e.cause
+	return GitHubWriteOutcome{Receipt: partial}, nil
 }
 
 func targetType(target SafeWriteTarget) string {
@@ -523,9 +549,25 @@ func targetID(target SafeWriteTarget) string {
 }
 
 func deterministicReceiptID(workspaceID, userID string, operation SafeWriteOperation, idempotencyKey, actionHash string) string {
-	payload := strings.Join([]string{strings.TrimSpace(workspaceID), strings.TrimSpace(userID), string(operation), strings.TrimSpace(idempotencyKey), actionHash}, "\x00")
+	payload, _ := json.Marshal(struct {
+		WorkspaceID    string             `json:"workspaceID"`
+		UserID         string             `json:"userID"`
+		Operation      SafeWriteOperation `json:"operation"`
+		IdempotencyKey string             `json:"idempotencyKey"`
+		ActionHash     string             `json:"actionHash"`
+	}{
+		WorkspaceID:    strings.TrimSpace(workspaceID),
+		UserID:         strings.TrimSpace(userID),
+		Operation:      operation,
+		IdempotencyKey: strings.TrimSpace(idempotencyKey),
+		ActionHash:     actionHash,
+	})
 	digest := sha256.Sum256([]byte(payload))
-	return "github-write-" + hex.EncodeToString(digest[:])
+	prefix := "github-write-"
+	if ProviderForSafeWriteOperation(operation) == ProviderWork {
+		prefix = "work-write-"
+	}
+	return prefix + hex.EncodeToString(digest[:])
 }
 
 func validateLabels(labels []string) error {

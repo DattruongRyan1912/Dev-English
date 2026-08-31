@@ -1,0 +1,508 @@
+{
+  "schema": "devenglish-agent-run@1",
+  "waveId": "WAVE-4",
+  "state": "running",
+  "reason": "TASK-009, TASK-009-COMPAT-1, TASK-009-UPGRADE-1, TASK-009-RECOVERY-1, TASK-009-ARTIFACT-1 and TASK-009-CI-RECOVERY-1 were approved by the same Sol Ultra reviewer. Hosted CI run 33050232555 exposed a production-defined Flutter fixture mismatch. The same Sol Ultra reviewer approved bounded repair task TASK-009-HOSTED-FLUTTER-R1, restricted to test/roleplay_voice_learning_test.dart; all local dual-environment gates pass, commit 228d3563037eb7c60ba65793d3d0479ed89fb14b was pushed to integration/wave-3 with the exact one-file cone, hosted run 33053487877 passed all six jobs at that SHA, and the same Sol Ultra reviewer accepted the hosted gate. PR #2 was squash-merged into main after a temporary required-review override, which was restored immediately to 1. Deployment remains unauthorized. Production backfill remains blocked on an explicit workspace-mapping decision.",
+  "planSource": {
+    "operatorPlan": "DevEnglish V1 multi-agent delivery plan supplied in the task",
+    "solPlanningCycle": "WAVE-4-NEXT-PLAN-7",
+    "solPlanningThreadId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+    "solPlanningTurnId": "01a041df-24fb-7730-b164-189c8ee47006",
+    "finalPlanReturned": true,
+    "controllerDecision": "Implement only TASK-009-CI-RECOVERY-1 by appending one blocking disposable backup/restore recovery job to CI, then stop for WAVE-4-REVIEW-8 by the same Sol Ultra reviewer."
+  },
+  "reviewCycle": "WAVE-4-REVIEW-8",
+  "reviewInputFrozen": true,
+  "newSpawnAllowed": false,
+  "attentionAgentId": null,
+  "reviewObservationTimeouts": 0,
+  "observationTimeouts": 0,
+  "lastObservedStatus": "approved",
+  "lastObservedAt": "2026-08-27T06:48:03Z",
+  "lastObservedEvidence": {
+    "source": "sol-ultra-review",
+    "taskId": "TASK-009-CI-RECOVERY-1",
+    "status": "approved",
+    "observedAt": "2026-08-27T06:48:03Z",
+    "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-CI-RECOVERY-1.md",
+    "reviewerThreadId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+    "reviewTurnId": "01a041f4-9523-7923-82b9-e3c3faee4b86",
+    "reviewVerdict": "TASK-009-CI-RECOVERY-1 approved by the same Sol Ultra reviewer; no blocking, high, medium or actionable-low findings"
+  },
+  "integrationTarget": "/Users/ryantruong/Project/Orther/Dev-English",
+  "integrationBranch": "integration/wave-3",
+  "integrationWorktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-3",
+  "baseCommit": "ea3bd05f92f4209e927cfbc9dd571acc4200ec28",
+  "maxWorkers": 4,
+  "maxReviewers": 1,
+  "acceptedReviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+  "previousAcceptedReviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+  "activeReviewSubmissionId": null,
+  "reviewHistory": [
+    {
+      "cycle": "WAVE-4-REVIEW-1",
+      "taskId": "TASK-009",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "No blocking, high, medium or actionable-low findings; TASK-009 may hand off to a bounded later Wave 4 plan.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009.md",
+      "submissionId": "01a03f9f-3edb-73f0-aba2-fcd10eb8900a"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-2",
+      "taskId": "TASK-009-COMPAT-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "No blocking, high, medium or actionable-low findings; the compatibility guard may hand off to later bounded planning.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-COMPAT-1.md",
+      "submissionId": "01a03fb8-3f2f-7ce0-aae1-09724aee39a6"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-3",
+      "taskId": "TASK-009-UPGRADE-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "High-severity false positive: substring matching allowed already-applied migration output to satisfy first-run assertions; require a blank database, exact full-line matching and a pre-migrated negative gate.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-UPGRADE-1.md",
+      "submissionId": "01a04125-e714-7d73-8d6b-ca223520da7e"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-3",
+      "taskId": "TASK-009-UPGRADE-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "The blank-database preflight, exact full-line migration assertions and pre-migrated negative control resolve the prior high-severity false positive; no blocking, high, medium or actionable-low findings remain.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-UPGRADE-1.md",
+      "submissionId": "01a04135-be61-77d2-bcb8-7b8d7cd72c92"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-4",
+      "taskId": "TASK-009-CI-UPGRADE-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "Only the new legacy-upgrade CI job was appended; positive and pre-migrated negative lifecycles, exact output checks, cleanup and repository gates passed. No blocking, high, medium or actionable-low findings remain.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-CI-UPGRADE-1.md",
+      "submissionId": "01a04148-dfbc-7b40-8f81-7f39a602f586"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-5",
+      "taskId": "TASK-009-RECOVERY-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "The exact restore guard and exit code are asserted, the canonical accepted receipt fixture is valid, 19 snapshot groups are recorded accurately, and no blocking, high, medium or actionable-low findings remain.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-RECOVERY-1.md",
+      "submissionId": "01a0417e-b82e-7a31-bae4-9d15016a42e0"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-6",
+      "taskId": "TASK-009-ARTIFACT-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "reviewTurnId": "01a041b3-f4c5-7aa3-9423-62e5ef15f942",
+      "verdict": "changes_requested",
+      "findingSummary": "Three findings: build was not anchored to the intended worktree, Git status alone did not prove cumulative WIP content/mode preservation, and traversal or grep read errors could fail open.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-ARTIFACT-1.md"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-6",
+      "taskId": "TASK-009-ARTIFACT-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "reviewTurnId": "01a041c3-624b-7f21-a7e5-3bbde9067985",
+      "verdict": "approved",
+      "findingSummary": "The three repair findings were resolved; root anchoring, tracked/untracked content and mode preservation, checked traversal, fail-closed grep handling and all regression gates passed with no blocking, high, medium or actionable-low findings.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-ARTIFACT-1.md"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-7",
+      "taskId": "TASK-009-CI-ARTIFACT-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "reviewTurnId": "01a041d8-9305-75c0-9fac-035f550958dc",
+      "verdict": "approved",
+      "findingSummary": "Exactly one blocking CI insertion was independently verified against the pre-task workflow blob; the frozen harness, artifact negative control, Flutter and Go gates passed with no blocking, high, medium or actionable-low findings. GitHub-hosted execution remains unverified because no push occurred.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-CI-ARTIFACT-1.md"
+    },
+    {
+      "cycle": "WAVE-4-REVIEW-8",
+      "taskId": "TASK-009-CI-RECOVERY-1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "reviewTurnId": "01a041f4-9523-7923-82b9-e3c3faee4b86",
+      "verdict": "approved",
+      "findingSummary": "The appended recovery job, exact pre-task blob reconstruction, frozen hashes/modes, disposable 71/71 backup/restore run, cleanup inspection and repository gates passed with no blocking, high, medium or actionable-low findings. GitHub-hosted execution remains unverified because no push occurred.",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-CI-RECOVERY-1.md"
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "TASK-009",
+      "title": "PostgreSQL migration-chain and invariant CI release gate",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": [".github/workflows/ci.yml"],
+      "dependencies": ["TASK-006", "TASK-007", "TASK-008", "TASK-008A", "Wave 3 accepted checkpoint"],
+      "acceptanceCriteria": [
+        "migration runner remains before package tests and cleanup remains unconditional",
+        "six requested backend packages run with readonly modules, count one, race, coverage and verbose output",
+        "five required PostgreSQL invariant tests are executed and pass",
+        "Knowledge, Work, Connectors and MCP report at least 90% coverage",
+        "no migration, runtime, compatibility, provider or cumulative Wave 3 source changes"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-1; request a new bounded Sol Ultra plan before migration 007, backfill or runtime wiring."
+    },
+    {
+      "taskId": "TASK-009-COMPAT-1",
+      "title": "Legacy user-scoped compatibility and isolation regression",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": ["backend/internal/store/postgres_integration_test.go"],
+      "dependencies": ["TASK-009 approved", "migrations 000–006", "existing PostgresStore user-scoped legacy contract"],
+      "acceptanceCriteria": [
+        "two workspaces for one user and zero workspaces for another do not change legacy user ownership",
+        "work_context and imported_sources preserve exact synthetic payloads and do not leak across user scope",
+        "test never selects a workspace or writes canonical Knowledge data",
+        "fresh disposable migration and six-package DB-enabled gates pass"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-2; request one bounded next Sol Ultra plan before compatibility runtime, production backfill or resolver work."
+    },
+    {
+      "taskId": "TASK-009-UPGRADE-1",
+      "title": "Disposable legacy-schema upgrade preservation harness",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": ["scripts/db_legacy_upgrade_test.sh"],
+      "dependencies": ["TASK-009 approved", "TASK-009-COMPAT-1 approved", "existing scripts/db_migrate.sh", "migrations 000–006"],
+      "acceptanceCriteria": [
+        "explicit disposable Compose opt-in and safe project/configuration validation fail closed",
+        "temporary symlinked views apply 000–002, seed parameterized legacy rows, then apply 003–006",
+        "legacy counts, exact fields, stable checksums and user scope are preserved across the upgrade",
+        "ambiguous two-workspace/zero-workspace topology is present without workspace mapping",
+        "first migration phases require a blank database and exact full-line applied output; an explicit pre-migrated negative control is rejected before seed",
+        "schema_migrations is exactly 000–006, the second phase is idempotent, and canonical Knowledge rows remain empty",
+        "fresh harness, migration runner and repository regression gates pass"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-3 re-review; request one new bounded Sol Ultra CI planning gate before implementation."
+    },
+    {
+      "taskId": "TASK-009-CI-UPGRADE-1",
+      "title": "CI gate for the legacy-schema upgrade harness",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": [".github/workflows/ci.yml"],
+      "dependencies": ["TASK-009 approved", "TASK-009-COMPAT-1 approved", "TASK-009-UPGRADE-1 approved", "existing repository CI Docker Compose setup"],
+      "acceptanceCriteria": [
+        "add exactly one isolated legacy-upgrade job while preserving existing triggers and jobs",
+        "run bash -n on the approved harness before database startup",
+        "run positive and separately pre-migrated negative controls with unique run_id/run_attempt project names and an isolated non-default port",
+        "require the negative control to exit before the seed marker and verify its exact success line",
+        "always clean both explicitly named Compose projects, volumes and orphans",
+        "do not modify scripts, migrations, application source, tests, provider configuration or existing CI jobs"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-4; request one new bounded Sol Ultra planning gate before further implementation or integration."
+    },
+    {
+      "taskId": "TASK-009-RECOVERY-1",
+      "title": "Disposable PostgreSQL backup and restore round-trip recovery harness",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": ["scripts/db_backup_restore_test.sh"],
+      "dependencies": [
+        "TASK-009-CI-UPGRADE-1 approved",
+        "existing scripts/db_backup.sh",
+        "existing scripts/db_restore.sh",
+        "existing scripts/db_migrate.sh",
+        "infra/docker-compose.ci.yml",
+        "migrations 000–006"
+      ],
+      "acceptanceCriteria": [
+        "explicit disposable opt-in and safe configuration validation fail closed before Docker or database mutation",
+        "fresh exact CI Compose project uses a unique devenglish-backup- project name and an isolated non-5432 host port",
+        "source database is blank, migrations 000–006 run through the existing migration runner, and deterministic synthetic legacy, Knowledge, Work and Safety data is seeded",
+        "existing backup and restore scripts are invoked; the custom archive is non-empty and mode 600",
+        "missing confirmation and wrong restore target are rejected before mutation",
+        "source and restored data snapshots, invariants, required schema objects, indexes and triggers match; restored migration rerun is idempotent",
+        "all disposable resources are cleaned up and repository regression gates pass"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-5; request one new bounded Sol Ultra planning gate before further implementation or integration."
+    },
+    {
+      "taskId": "TASK-009-ARTIFACT-1",
+      "title": "Production web artifact security gate",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": ["scripts/production_web_artifact_test.sh"],
+      "dependencies": [
+        "TASK-009-RECOVERY-1 approved",
+        "Dockerfile.web",
+        "lib/src/api.dart",
+        "lib/src/app_controller.dart",
+        "test/runtime_guard_test.dart",
+        "test/production_shell_test.dart"
+      ],
+      "acceptanceCriteria": [
+        "build a Flutter production web artifact into a temporary directory with a synthetic public .invalid API origin and no real secret environment forwarding",
+        "scan every regular artifact file binary-safely and require the synthetic origin while rejecting localhost:8080, known credential markers, the synthetic sentinel and source-map artifacts",
+        "negative control injects only the synthetic sentinel into a temporary artifact copy and is rejected without printing match contents",
+        "two consecutive runs pass, clean all temporary output, and leave the cumulative repository WIP unchanged",
+        "do not start backend/database, use Docker/curl, call providers, modify application/tests/CI/Dockerfile or add migrations"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-6 re-review; request one new bounded Sol Ultra plan before further implementation or integration."
+    },
+    {
+      "taskId": "TASK-009-CI-ARTIFACT-1",
+      "title": "Enforce the production web artifact gate in CI",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": [".github/workflows/ci.yml"],
+      "dependencies": [
+        "TASK-009-ARTIFACT-1 approved by WAVE-4-REVIEW-6",
+        "existing Flutter CI job",
+        "approved scripts/production_web_artifact_test.sh, mode 100755, hash 096f171641974b2532cb0e4b3f9e01988b346fd0"
+      ],
+      "acceptanceCriteria": [
+        "insert exactly one named blocking artifact-security step immediately after the existing Flutter flutter build web --release step",
+        "step uses set -euo pipefail, checks a generic clean Git status before and after, runs bash -n and invokes the approved harness exactly once",
+        "workflow triggers, permissions, actions, services, existing jobs and all other steps remain byte-equivalent",
+        "no if, continue-on-error, secret expression, environment override, artifact upload, Docker command, provider call or network endpoint is introduced",
+        "workflow YAML parses and structural assertions prove the exact step order and command order",
+        "approved artifact harness mode and hash remain unchanged; no GitHub-hosted execution is claimed without an authorized push"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-7; request one new bounded Sol Ultra plan before further implementation or integration."
+    },
+    {
+      "taskId": "TASK-009-CI-RECOVERY-1",
+      "title": "Enforce backup/restore recovery in CI",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": [".github/workflows/ci.yml"],
+      "dependencies": [
+        "TASK-009-RECOVERY-1 approved by WAVE-4-REVIEW-5",
+        "TASK-009-CI-ARTIFACT-1 approved by WAVE-4-REVIEW-7",
+        "approved scripts/db_backup_restore_test.sh, mode 100755, hash 81d947e270fd75e57717beaf46ec738b9f6c3e73",
+        "approved scripts/db_backup.sh, scripts/db_restore.sh, scripts/db_migrate.sh and infra/docker-compose.ci.yml"
+      ],
+      "acceptanceCriteria": [
+        "append exactly one top-level backup-restore-recovery job and preserve the current workflow byte-equivalent after structural removal of that job",
+        "use only actions/checkout@v4; bind DEVENGLISH_CI_PORT 55433 and a unique devenglish-backup-restore-${{ github.run_id }}-${{ github.run_attempt }} project",
+        "run bash -n on the four recovery/migration scripts before database mutation and invoke the approved recovery harness exactly once",
+        "set the disposable opt-in, approved Compose file, project, postgres service, user and database; check generic clean Git status before and after the harness",
+        "bound the harness step with timeout-minutes 20 and add a separate if always cleanup using down --volumes --remove-orphans for only the exact project",
+        "fresh disposable recovery exits 0 with exact 71/71 schema-object recovery, source/restore equality, negative restore guards and no remaining resources",
+        "frozen dependency hashes and modes remain unchanged; no GitHub-hosted success is claimed without an authorized push"
+      ],
+      "reviewAfter": "Approved by WAVE-4-REVIEW-8; request one new bounded Sol Ultra plan before further implementation or integration."
+    }
+  ],
+  "controllerExecution": {
+    "taskId": "TASK-009-CI-RECOVERY-1",
+    "status": "completed",
+    "owner": "main-controller",
+    "model": "gpt-5.6-luna",
+    "worktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-3",
+    "spawnedAgent": false,
+    "fileCone": [".github/workflows/ci.yml"],
+    "forbiddenChangesVerified": [
+      "all files outside .github/workflows/ci.yml",
+      "scripts/db_backup_restore_test.sh remains frozen at approved hash 81d947e270fd75e57717beaf46ec738b9f6c3e73 and mode 755",
+      "scripts/db_backup.sh remains frozen at approved hash 0bfbcc1c9ef364577a15b853f4b180d28440afed",
+      "scripts/db_restore.sh remains frozen at approved hash 8d85da0e4f58044c45203863b7d2e3f4c1fb0bc0",
+      "scripts/db_migrate.sh remains frozen at approved hash 696cd692082155c20892b41e589202549ef2ae98",
+      "infra/docker-compose.ci.yml remains frozen at approved hash 50a096f90e49ced3c542b522718d8aae25494022",
+      "all existing workflow triggers, jobs and steps outside the one appended job",
+      "migrations, migration 007, production backfill, workspace resolver, runtime/provider wiring, integration and cumulative Wave 3/Wave 4 WIP"
+    ],
+    "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-CI-RECOVERY-1.md",
+    "previousApprovedTask": {
+      "taskId": "TASK-009-CI-ARTIFACT-1",
+      "reviewCycle": "WAVE-4-REVIEW-7",
+      "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-CI-ARTIFACT-1.md"
+    },
+    "testEvidence": {
+      "workflowStructureExit": 0,
+      "workflowYamlExit": 0,
+      "workflowDiffExit": 0,
+      "bashSyntaxExit": 0,
+      "recoveryHarnessExit": 0,
+      "recoveryCleanupExit": 0,
+      "goTestsExit": 0,
+      "goRaceTestsExit": 0,
+      "goVetExit": 0,
+      "diffCheckExit": 0,
+      "manifestJsonExit": 0,
+      "protocolCheckExit": 0,
+      "actionlintAvailable": false,
+      "recoveryHarnessHash": "81d947e270fd75e57717beaf46ec738b9f6c3e73",
+      "recoveryHarnessMode": "755",
+      "backupScriptHash": "0bfbcc1c9ef364577a15b853f4b180d28440afed",
+      "restoreScriptHash": "8d85da0e4f58044c45203863b7d2e3f4c1fb0bc0",
+      "migrationScriptHash": "696cd692082155c20892b41e589202549ef2ae98",
+      "composeFileHash": "50a096f90e49ced3c542b522718d8aae25494022",
+      "preWorkflowHash": "bed46952fee1b786049ca92ed1c7e095c6fffdc5",
+      "postWorkflowHash": "498fcb9309ddcf23306e83f7a6bb4550b49db9d6",
+      "requiredWorkflowPort": "55433",
+      "localRecoveryPort": "55434",
+      "localRecoveryProject": "devenglish-backup-restore-20260827-0634a",
+      "reviewerRecoveryPort": "55435",
+      "localFirstRecoveryAttemptExit": 1,
+      "localFirstRecoveryAttemptReason": "required local port 55433 was already owned by existing WIP container; no WIP resource was removed",
+      "recoveredSchemaObjects": "71/71",
+      "githubHostedCi": "unverified",
+      "liveProviderUsed": false,
+      "reviewStatus": "approved WAVE-4-REVIEW-8"
+    }
+  },
+  "agents": [
+    {
+      "taskId": "WAVE-4-NEXT-PLAN-7",
+      "agentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "name": "Huygens",
+      "role": "reviewer",
+      "model": "gpt-5.6-sol",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "turnId": "01a041df-24fb-7730-b164-189c8ee47006",
+      "terminalReason": "bounded TASK-009-CI-RECOVERY-1 plan returned; implementation handoff to main Luna",
+      "latestReview": {
+        "cycle": "WAVE-4-REVIEW-10",
+        "turnId": "01a04252-4b26-7db2-88bf-22e7ca34c323",
+        "verdict": "approved"
+      },
+      "latestPlan": {
+      "cycle": "WAVE-4-REVIEW-9",
+      "turnId": "01a04244-e239-7410-8a91-19dd9bf9ff4c",
+      "taskId": "TASK-009-HOSTED-FLUTTER-R1",
+      "status": "approved",
+      "reason": "The same Sol Ultra reviewer approved the one-file test-only repair after independently verifying the diff and all local dual-environment Flutter gates. The authorized commit/push completed at 228d3563037eb7c60ba65793d3d0479ed89fb14b; a new hosted pull_request run at that exact SHA and same-session review remain mandatory."
+      },
+      "previousAssignment": {
+        "taskId": "WAVE-4-NEXT-PLAN-5",
+        "turnId": "01a0419d-b5aa-7790-8df2-202afd569d62",
+        "status": "plan_returned"
+      },
+      "evidencePaths": [
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a041df-24fb-7730-b164-189c8ee47006",
+        "docs/project/agent-runs/WAVE-4-TASK-009-ARTIFACT-1.md",
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a041d8-9305-75c0-9fac-035f550958dc",
+        "docs/project/agent-runs/WAVE-4-TASK-009-CI-ARTIFACT-1.md",
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a041fc-fbff-7530-bb2c-5f532288b7e6"
+      ]
+    }
+  ],
+  "incidents": [
+    {
+      "type": "local_database_endpoint_collision",
+      "status": "resolved",
+      "detail": "A first local attempt reached the native PostgreSQL service on port 5432; the disposable Compose service was isolated on host port 55432 before acceptance evidence was collected."
+    }
+  ],
+  "nextHandoff": {
+    "taskId": "TASK-009-HOSTED-FLUTTER-R1",
+    "status": "approved",
+    "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+    "reviewerThreadId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+    "priorTaskId": "TASK-009-HOSTED-CI-EVIDENCE-1",
+    "priorPlanCycle": "WAVE-4-REVIEW-9",
+    "planTurnId": "01a04244-e239-7410-8a91-19dd9bf9ff4c",
+    "implementationWorktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-3",
+    "baseCommit": "8764fc769e470562f0bba076640771baf127c409",
+    "fileCone": [
+      "test/roleplay_voice_learning_test.dart"
+    ],
+    "evidencePath": "docs/project/agent-runs/WAVE-4-TASK-009-HOSTED-FLUTTER-R1.md",
+    "authorization": {
+      "authorizedAt": "2026-08-27T07:15:19Z",
+      "source": "current user instruction: cho phép",
+      "operation": "commit and push",
+      "worktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-3",
+      "branch": "integration/wave-3",
+      "remote": "origin",
+      "scope": "All current changed paths in this worktree that match approved Wave 3 and Wave 4 task cones; canonical WIP outside this worktree is excluded.",
+      "commitSha": "228d3563037eb7c60ba65793d3d0479ed89fb14b",
+      "remoteRef": "refs/heads/integration/wave-3",
+      "pushExit": 0
+    },
+    "blocker": "No implementation or hosted-gate blocker remains: the one-file repair is locally verified, approved by the same Sol Ultra reviewer, pushed at 228d3563037eb7c60ba65793d3d0479ed89fb14b, hosted run 33053487877 passed all six jobs at that exact SHA, and PR #2 was squash-merged into main at 104304f12f411dd534aa4b385e964b3b8c11ae43. The main push CI run 33056690884 passed all six jobs, and main protection was restored to require 1 approving review. Deployment remains unauthorized.",
+    "priorHostedCi": {
+      "status": "failed",
+      "runId": 33050232555,
+      "runUrl": "https://github.com/DattruongRyan1912/Dev-English/actions/runs/33050232555",
+      "headSha": "8764fc769e470562f0bba076640771baf127c409",
+      "failure": "Production-defined Flutter fixtures expected development demo fallback; the five failures were repaired in TASK-009-HOSTED-FLUTTER-R1."
+    },
+    "hostedCi": {
+      "status": "passed",
+      "runId": 33053487877,
+      "runUrl": "https://github.com/DattruongRyan1912/Dev-English/actions/runs/33053487877",
+      "event": "pull_request",
+      "headSha": "228d3563037eb7c60ba65793d3d0479ed89fb14b",
+      "jobs": {
+        "backend": "success",
+        "production": "success",
+        "postgres": "success",
+        "legacy-upgrade": "success",
+        "backup-restore-recovery": "success",
+        "flutter": "success"
+      },
+      "terminal": true,
+      "pullRequest": {
+        "number": 2,
+        "url": "https://github.com/DattruongRyan1912/Dev-English/pull/2",
+        "authorization": "current user instruction: cho phép"
+      },
+      "reason": "The new hosted pull_request gate ran on the exact repair SHA; backend, Flutter (including production mode and browser smoke), production artifact security, PostgreSQL, legacy-upgrade, and backup-restore-recovery all completed successfully. The same Sol Ultra session independently reviewed the exact SHA/run and accepted the hosted gate."
+    },
+    "hostedReview": {
+      "cycle": "WAVE-4-REVIEW-10",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "reviewerThreadId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "turnId": "01a04252-4b26-7db2-88bf-22e7ca34c323",
+      "verdict": "approved",
+      "findings": "No task-scoped blocking, high, medium, or actionable-low findings.",
+      "accepted": true,
+      "limitations": "GitNexus index remains stale and was not refreshed in the read-only review; GitHub emitted pre-existing Node.js action deprecation warnings."
+    },
+    "merge": {
+      "pullRequest": 2,
+      "method": "squash",
+      "baseRef": "main",
+      "headSha": "228d3563037eb7c60ba65793d3d0479ed89fb14b",
+      "mergeCommit": "104304f12f411dd534aa4b385e964b3b8c11ae43",
+      "mergedAt": "2026-08-27T09:01:58Z",
+      "branchProtectionTemporaryOverride": {
+        "requiredApprovingReviewCountBefore": 1,
+        "requiredApprovingReviewCountDuringMerge": 0,
+        "requiredApprovingReviewCountAfter": 1
+      },
+      "mainCiRun": {
+        "runId": 33056690884,
+        "headSha": "104304f12f411dd534aa4b385e964b3b8c11ae43",
+        "status": "passed",
+        "jobs": [
+          "backend",
+          "flutter",
+          "production",
+          "postgres",
+          "legacy-upgrade",
+          "backup-restore-recovery"
+        ]
+      },
+      "deployment": "not performed; no production target or deploy workflow is configured in the repository"
+    },
+    "reviewInstruction": "Hosted run 33053487877 at exact SHA 228d3563037eb7c60ba65793d3d0479ed89fb14b was independently reviewed and accepted by the same Sol Ultra session. PR #2 was squash-merged into main with separate human authorization; main CI run 33056690884 passed all six jobs and branch protection was restored. Do not deploy without separate authorization and a verified production target. Do not loosen production fail-closed behavior or modify assertions to hide failures."
+  },
+  "humanAuthorization": {
+    "implementation": true,
+    "integration": true,
+    "foundationMigrations": true,
+    "commit": true,
+    "push": true,
+    "merge": true,
+    "deploy": false
+  }
+}

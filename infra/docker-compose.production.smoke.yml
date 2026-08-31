@@ -1,0 +1,87 @@
+services:
+  # This fixture mirrors the production backend topology without starting the
+  # public TLS proxy. It is only used by the guarded production runtime smoke.
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${DEVENGLISH_SMOKE_POSTGRES_DB:-devenglish}
+      POSTGRES_USER: ${DEVENGLISH_SMOKE_POSTGRES_USER:-devenglish}
+      POSTGRES_PASSWORD: ${DEVENGLISH_SMOKE_POSTGRES_PASSWORD:?set smoke postgres password}
+    volumes:
+      - devenglish-production-smoke-postgres:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  embedding:
+    build:
+      context: ./embedding
+      dockerfile: Dockerfile
+    environment:
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+      EMBEDDING_DEVICE: ${EMBEDDING_DEVICE:-cpu}
+    volumes:
+      - devenglish-production-smoke-embedding-models:/models
+    ports:
+      - "${DEVENGLISH_SMOKE_EMBEDDING_PORT:-18090}:8090"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/healthz', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 24
+      start_period: 180s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      DEVENGLISH_ENV: production
+      DEVENGLISH_MODULES: ${DEVENGLISH_MODULES:-all}
+      PORT: "8080"
+      DEVENGLISH_ALLOWED_ORIGINS: ${DEVENGLISH_ALLOWED_ORIGINS:?set smoke allowed origin}
+      DEVENGLISH_AUTH_SECRET: ${DEVENGLISH_AUTH_SECRET:?set smoke auth secret}
+      DEVENGLISH_LOGIN_SECRET: ${DEVENGLISH_LOGIN_SECRET:?set smoke login secret}
+      DEVENGLISH_SECRET_ENCRYPTION_KEY: ${DEVENGLISH_SECRET_ENCRYPTION_KEY:?set smoke encryption key}
+      DATABASE_URL: postgres://${DEVENGLISH_SMOKE_POSTGRES_USER:-devenglish}:${DEVENGLISH_SMOKE_POSTGRES_PASSWORD}@postgres:5432/${DEVENGLISH_SMOKE_POSTGRES_DB:-devenglish}?sslmode=disable
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?set smoke provider key}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:?set smoke provider base URL}
+      DEEPSEEK_FAST_MODEL: ${DEEPSEEK_FAST_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_SMART_MODEL: ${DEEPSEEK_SMART_MODEL:-deepseek-v4-pro}
+      EMBEDDING_SIDECAR_URL: http://embedding:8090
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-intfloat/multilingual-e5-small}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      embedding:
+        condition: service_healthy
+    ports:
+      - "${DEVENGLISH_SMOKE_BACKEND_PORT:-18080}:8080"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:8080/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  devenglish-production-smoke-postgres:
+  devenglish-production-smoke-embedding-models:

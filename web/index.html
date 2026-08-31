@@ -18,7 +18,7 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="DevEnglish work companion with grounded AI assistance.">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
@@ -29,18 +29,155 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>devenglish</title>
+  <title>DevEnglish</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f7f8fb;
+      color: #172033;
+    }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background: #f7f8fb;
+    }
+
+    #devenglish-boot {
+      box-sizing: border-box;
+      display: grid;
+      min-height: 100vh;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .devenglish-boot-card {
+      width: min(100%, 420px);
+      box-sizing: border-box;
+      padding: 28px;
+      border: 1px solid #e1e6f0;
+      border-radius: 20px;
+      background: #ffffff;
+      box-shadow: 0 16px 40px rgba(36, 52, 82, 0.08);
+      text-align: center;
+    }
+
+    .devenglish-boot-mark {
+      display: inline-grid;
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      place-items: center;
+      border-radius: 14px;
+      background: #eaf1ff;
+      color: #2f65d9;
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .devenglish-boot-card h1 {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.3;
+    }
+
+    .devenglish-boot-card p {
+      margin: 8px 0 0;
+      color: #667085;
+      line-height: 1.5;
+    }
+
+    .devenglish-boot-progress {
+      width: 180px;
+      height: 4px;
+      margin: 20px auto 0;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e8edf6;
+    }
+
+    .devenglish-boot-progress::before {
+      display: block;
+      width: 42%;
+      height: 100%;
+      border-radius: inherit;
+      background: #2f65d9;
+      content: "";
+      animation: devenglish-boot-progress 1.4s ease-in-out infinite;
+    }
+
+    #devenglish-boot-error {
+      display: none;
+      margin-top: 18px;
+    }
+
+    #devenglish-boot-error button {
+      margin-top: 14px;
+      padding: 10px 16px;
+      border: 0;
+      border-radius: 10px;
+      background: #2f65d9;
+      color: #ffffff;
+      cursor: pointer;
+      font: inherit;
+      font-weight: 600;
+    }
+
+    @keyframes devenglish-boot-progress {
+      from { transform: translateX(-140%); }
+      to { transform: translateX(360%); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .devenglish-boot-progress::before { animation: none; }
+    }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
+  <main id="devenglish-boot" aria-live="polite">
+    <section class="devenglish-boot-card" aria-labelledby="devenglish-boot-title">
+      <div class="devenglish-boot-mark" aria-hidden="true">✦</div>
+      <h1 id="devenglish-boot-title">DevEnglish</h1>
+      <p id="devenglish-boot-message">Preparing your workspace…</p>
+      <div class="devenglish-boot-progress" role="progressbar" aria-label="Loading DevEnglish"></div>
+      <div id="devenglish-boot-error">
+        <p>DevEnglish could not start. Check the local server, then try again.</p>
+        <button type="button" onclick="location.reload()">Reload</button>
+      </div>
+    </section>
+  </main>
+  <script>
+    (() => {
+      const boot = document.getElementById('devenglish-boot');
+      const error = document.getElementById('devenglish-boot-error');
+      const progress = document.querySelector('.devenglish-boot-progress');
+      let started = false;
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
+      const hideBoot = () => {
+        if (started) return;
+        started = true;
+        boot.remove();
+      };
+
+      const observer = new MutationObserver(() => {
+        if (document.querySelector('flt-glass-pane, flt-semantics-host')) {
+          hideBoot();
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+
+      window.addEventListener('flutter-first-frame', hideBoot, { once: true });
+      window.setTimeout(() => {
+        if (started) return;
+        progress.style.display = 'none';
+        error.style.display = 'block';
+      }, 30000);
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

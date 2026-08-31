@@ -1,0 +1,314 @@
+{
+  "schema": "devenglish-agent-run@1",
+  "waveId": "WAVE-3",
+  "state": "running",
+  "reason": "TASK-008A is approved by WAVE-3-REVIEW-14 after the bounded R3 serialized-stop repair; continue with a bounded TASK-009 scope while commit, push, merge and deploy remain unauthorized.",
+  "planSource": {
+    "operatorPlan": "DevEnglish V1 multi-agent delivery plan supplied in the task",
+    "solPlanningCycle": "WAVE-3-PLAN-2",
+    "solPlanningSubmissionId": "01a03e4a-ab1c-7251-a43c-efb0bb74e8b5",
+    "solPlanningThreadId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+    "finalPlanReturned": true,
+    "controllerDecision": "Implement the exact WAVE-3-TASK-007 cone amendment: reuse existing MCP transport/security, add identity-bound read-only application adapters and minimal Knowledge read wrappers, and stop for WAVE-3-REVIEW-4 before runtime composition or mutation."
+  },
+  "reviewCycle": "WAVE-3-REVIEW-14",
+  "reviewInputFrozen": true,
+  "newSpawnAllowed": false,
+  "attentionAgentId": null,
+  "reviewObservationTimeouts": 0,
+  "observationTimeouts": 0,
+  "lastObservedStatus": "completed",
+  "lastObservedAt": "2026-08-26T19:07:09Z",
+  "lastObservedEvidence": {
+    "source": "codex_app__read_thread",
+    "threadId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+    "submissionId": "01a03f79-934a-7f03-96ee-55f298b38fff",
+    "threadStatus": "idle",
+    "turnStatus": "completed",
+    "terminalReason": "approved; no blocker, HIGH, MEDIUM or actionable-LOW findings",
+    "observedAt": "2026-08-26T19:16:32Z",
+    "reviewCycle": "WAVE-3-REVIEW-14",
+    "verdict": "approved",
+    "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-14.md"
+  },
+  "recoveryDecision": {
+    "recordedAt": "2026-08-26T12:39:49Z",
+    "decision": "Do not replace or duplicate the Sol planning/review slot. Continue only with a bounded main-controller implementation slice whose dependency and acceptance checks are directly supported by the repository source and operator Wave 3 plan.",
+    "basis": [
+      "the authoritative Sol turn is terminal failed with usage_limit",
+      "the final message contains commentary only and no final plan",
+      "the same Sol thread remains the only permitted reviewer for the next review attempt",
+      "commit, push, merge and deploy remain unauthorized"
+    ]
+  },
+  "integrationTarget": "/Users/ryantruong/Project/Orther/Dev-English",
+  "integrationBranch": "integration/wave-3",
+  "integrationWorktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-3",
+  "baseCommit": "ea3bd05f92f4209e927cfbc9dd571acc4200ec28",
+  "maxWorkers": 4,
+  "maxReviewers": 1,
+  "acceptedReviewerAgentId": null,
+  "previousAcceptedReviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+  "activeReviewSubmissionId": null,
+  "reviewHistory": [
+    {
+      "cycle": "WAVE-3-REVIEW-4",
+      "taskId": "TASK-007",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "No blocker; HIGH Unicode/identity validation boundary, MEDIUM public repository-bypassable wiring, and MEDIUM isolation/forwarding test gaps",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-4.md",
+      "submissionId": "01a03e65-9493-7811-827b-bed29d1f9acf"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-5",
+      "taskId": "TASK-007-R1",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "One HIGH raw UTF-8 validation boundary remains before JSON argument decoding; prior R4 repairs verified",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-5.md",
+      "submissionId": "01a03e7d-6511-7162-88d3-20c852c10fd2"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-7",
+      "taskId": "TASK-007-R2",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "No blocking, high, medium, or actionable low findings; TASK-007 may proceed to TASK-008",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-7.md",
+      "submissionId": "01a03e9c-38c5-7391-87d6-f18ea764adb2"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-8",
+      "taskId": "TASK-008",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "Two HIGH findings: unrelated demo citations and authenticated production exposing demo workspace; two MEDIUM findings: contradictory demo provenance and stale/incomplete runtime coverage",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-8.md",
+      "submissionId": "01a03ebd-65fd-7431-8f50-4d1af5a627d3"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-9",
+      "taskId": "TASK-008",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "One HIGH regression: authenticated production renders only HomeScreen and loses the legacy Practice, Review and Progress navigation; prior R8 repairs verified",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-9.md",
+      "submissionId": "01a03eda-f408-7423-b097-e3bf3270caa5"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-10",
+      "taskId": "TASK-008",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "No blocking, high, medium, or actionable-low findings; TASK-008 may proceed to TASK-008A",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-10.md",
+      "submissionId": "01a03ee8-1689-7c81-8389-66c7f5c6d460"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-11",
+      "taskId": "TASK-008A",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "Three HIGH findings on stream/container MIME, cancel/timeout bounds and cleanup, plus one MEDIUM help-fallback matching issue",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-11.md",
+      "submissionId": "01a03f11-a0d4-7fa3-80df-563c122aa42f"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-12",
+      "taskId": "TASK-008A",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "HIGH recording terminal-state race; MEDIUM PCM snapshot before stream drain",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-12.md",
+      "submissionId": "01a03f32-86c8-7c31-9b6f-ba8a3500b1a1"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-13",
+      "taskId": "TASK-008A",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "changes_requested",
+      "findingSummary": "MEDIUM stop serialization can be lost after timeout",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-13.md",
+      "submissionId": "01a03f6c-3d64-7482-823d-4e723ad34496"
+    },
+    {
+      "cycle": "WAVE-3-REVIEW-14",
+      "taskId": "TASK-008A",
+      "reviewerAgentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "verdict": "approved",
+      "findingSummary": "No blocker, HIGH, MEDIUM or actionable-LOW findings remain after R3",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-14.md",
+      "submissionId": "01a03f79-934a-7f03-96ee-55f298b38fff"
+    }
+  ],
+  "tasks": [
+    {
+      "taskId": "TASK-006",
+      "title": "Grounded assistant contract and deterministic response boundary",
+      "status": "approved",
+      "owner": "main-controller",
+      "model": "gpt-5.6-luna",
+      "fileCone": ["backend/internal/assistant/"],
+      "dependencies": ["WAVE-2 approved checkpoint"],
+      "acceptanceCriteria": [
+        "response has stable answer, evidence, unknowns, staleSources, suggestedActions and actionReceipts fields",
+        "citations are accepted only when they match supplied evidence identifiers",
+        "no evidence produces an explicit unknown or inferred state and never a fabricated citation",
+        "stale evidence is surfaced without being promoted to current canonical fact",
+        "suggested actions are data only and cannot execute mutations"
+      ],
+      "reviewAfter": "Approved by WAVE-3-REVIEW-3; proceed to the next dependency-ordered Wave 3 task with the same single-reviewer protocol"
+    },
+    {
+      "taskId": "TASK-007",
+      "title": "MCP application-service wiring",
+      "status": "approved",
+      "fileCone": [
+        "backend/internal/mcp/auth.go",
+        "backend/internal/mcp/application.go",
+        "backend/internal/mcp/application_test.go",
+        "backend/internal/mcp/mcp_test.go",
+        "backend/internal/knowledge/service.go",
+        "backend/internal/knowledge/service_read_test.go"
+      ],
+      "dependencies": ["TASK-006", "one accepted Sol review"]
+    },
+    {
+      "taskId": "TASK-008",
+      "title": "Today, Work, Knowledge and text assistant UI",
+      "status": "approved",
+      "fileCone": ["lib/", "test/"],
+      "dependencies": ["TASK-006", "TASK-007"],
+      "reviewAfter": "Approved by WAVE-3-REVIEW-10; TASK-008A may proceed under the same single-reviewer protocol."
+    },
+    {
+      "taskId": "TASK-008A",
+      "title": "Push-to-talk, editable transcript, on-demand TTS and learning overlay",
+      "status": "approved",
+      "fileCone": ["lib/", "pubspec.yaml", "pubspec.lock", "test/"],
+      "dependencies": ["TASK-006", "TASK-008"],
+      "reviewAfter": "Approved by WAVE-3-REVIEW-14; TASK-009 is ready for a bounded scope pass under the same single-reviewer protocol."
+    }
+  ],
+  "controllerExecution": {
+    "taskId": "TASK-008A",
+    "status": "completed",
+    "owner": "main-controller",
+    "model": "gpt-5.6-luna",
+    "worktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-3",
+    "spawnedAgent": false,
+    "note": "Completed the bounded TASK-008A R3 repair in the amended Flutter/test cone; WAVE-3-REVIEW-14 approved it. No worker or additional reviewer was spawned.",
+    "evidencePath": "docs/project/agent-runs/WAVE-3-TASK-008A-R3.md",
+    "testEvidence": {
+      "formatCheckExit": 0,
+      "flutterAnalyzeExit": 0,
+      "flutterTestsPassed": 21,
+      "flutterTestsSkipped": 2,
+      "flutterTestExit": 0,
+      "flutterBuildWebExit": 0,
+      "roleplayVoiceLearningTestCovered": true,
+      "focusedVoiceAndApiTestsPassed": 12,
+      "goTestsPassed": 389,
+      "goRaceTestsPassed": 389,
+      "diffCheckExit": 0,
+      "browserConsoleErrors": null,
+      "browserConsoleWarnings": null,
+      "browserDesktopInteractionVerified": true,
+      "browserUnknownWithoutCitationVerified": true,
+      "browserTaskCitationVerified": true,
+      "evidenceStatus": "TASK-008A R3 repair evidence complete; WAVE-3-REVIEW-14 approved",
+      "repairStatus": "approved",
+      "nextTask": "TASK-009 bounded scope pass"
+    }
+  },
+  "agents": [
+    {
+      "taskId": "WAVE-3-REVIEW-14",
+      "agentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "name": "Huygens",
+      "role": "reviewer",
+      "model": "gpt-5.6-sol",
+      "parentAgentId": null,
+      "status": "completed",
+      "canSpawn": false,
+      "submissionId": "01a03f79-934a-7f03-96ee-55f298b38fff",
+      "terminalReason": "approved; no blocker, HIGH, MEDIUM or actionable-LOW findings",
+      "previousAssignment": {
+        "taskId": "WAVE-3-REVIEW-13",
+        "status": "completed",
+        "terminalReason": "changes_requested; R3 repair required before acceptance"
+      },
+      "evidencePaths": [
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03e20-f19c-70c0-9421-b70aaf6a8e6e",
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03e32-ce88-7d41-8f9b-05c1c9660fbb",
+        "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03e44-88d0-7112-b615-34e13c9de345",
+        "docs/project/agent-runs/WAVE-3-REVIEW-1.md",
+        "docs/project/agent-runs/WAVE-3-REVIEW-2.md",
+        "docs/project/agent-runs/WAVE-3-REVIEW-3.md",
+        "docs/project/agent-runs/WAVE-3-TASK-007.md",
+      "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03e65-9493-7811-827b-bed29d1f9acf",
+      "docs/project/agent-runs/WAVE-3-REVIEW-5.md",
+      "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03e91-47b9-7cd2-9b87-6a0b2a1ee755",
+      "docs/project/agent-runs/WAVE-3-REVIEW-6-ATTENTION.md",
+      "codex-thread:01a03c8f-5f2d-7833-ad4c-94557dcca88f#turn-01a03e9c-38c5-7391-87d6-f18ea764adb2",
+      "docs/project/agent-runs/WAVE-3-REVIEW-7.md",
+      "docs/project/agent-runs/WAVE-3-TASK-008.md",
+      "docs/project/agent-runs/WAVE-3-TASK-008-R1.md",
+      "docs/project/agent-runs/WAVE-3-REVIEW-9.md",
+      "docs/project/agent-runs/WAVE-3-TASK-008-R2.md",
+      "docs/project/agent-runs/WAVE-3-REVIEW-10.md",
+        "docs/project/agent-runs/WAVE-3-TASK-008A.md",
+        "docs/project/agent-runs/WAVE-3-REVIEW-11.md",
+        "docs/project/agent-runs/WAVE-3-TASK-008A-R1.md",
+        "docs/project/agent-runs/WAVE-3-REVIEW-12.md",
+        "docs/project/agent-runs/WAVE-3-TASK-008A-R2.md",
+        "docs/project/agent-runs/WAVE-3-REVIEW-13.md",
+        "docs/project/agent-runs/WAVE-3-TASK-008A-R3.md"
+      ]
+    }
+  ],
+  "incidents": [
+    {
+      "id": "ORCH-INC-20260826-005",
+      "type": "reviewer_usage_limit",
+      "taskId": "WAVE-3-PLAN-1",
+      "agentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "status": "terminal",
+      "summary": "Sol Ultra planning turn failed with usage_limit before returning a final plan.",
+      "recovery": "Recorded the exact terminal evidence, prohibited replacement/duplicate spawn, and continued with a source-bounded TASK-006 slice.",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-PLANNING-ATTENTION.md"
+    },
+    {
+      "id": "ORCH-INC-20260826-006",
+      "type": "reviewer_usage_limit",
+      "taskId": "WAVE-3-REVIEW-6",
+      "agentId": "01a03c8f-5f2d-7833-ad4c-94557dcca88f",
+      "status": "terminal",
+      "summary": "Sol Ultra review failed with usage_limit before returning a terminal verdict.",
+      "recovery": "Recorded the failed turn, kept the same reviewer slot, prohibited replacement/duplicate spawn, and froze TASK-007/TASK-008 until quota reset.",
+      "evidencePath": "docs/project/agent-runs/WAVE-3-REVIEW-6-ATTENTION.md"
+    }
+  ],
+  "nextHandoff": {
+    "taskId": "TASK-009",
+    "status": "ready_for_scoping",
+    "implementationOwner": "main-controller",
+    "fileCone": ["to be selected after source-bounded TASK-009 scope review"],
+    "worktree": "/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-3",
+    "baseCommit": "ea3bd05f92f4209e927cfbc9dd571acc4200ec28",
+    "evidencePath": "docs/project/agent-runs/WAVE-3-TASK-008A-R3.md",
+    "planSubmissionId": "01a03e4a-ab1c-7251-a43c-efb0bb74e8b5",
+    "reviewSubmissionId": null,
+    "reviewAfter": "First inspect the repository and produce a bounded TASK-009 implementation cone; then send the resulting slice to the same Sol Ultra reviewer. Commit, push, merge and deploy remain unauthorized."
+  },
+  "humanAuthorization": {
+    "implementation": true,
+    "integration": true,
+    "foundationMigrations": true,
+    "commit": false,
+    "push": false,
+    "merge": false,
+    "deploy": false
+  }
+}

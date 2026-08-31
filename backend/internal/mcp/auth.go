@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
@@ -61,6 +62,33 @@ func WithTokenRandom(random io.Reader) TokenStoreOption {
 	}
 }
 
+// PersistedToken is the database-safe representation of an MCP credential.
+// Digest contains only the one-way bearer-secret digest; the clear token is
+// never handed to a persistence implementation.
+type PersistedToken struct {
+	ID          string
+	Digest      []byte
+	Scopes      []Scope
+	ExpiresAt   time.Time
+	Revoked     bool
+	WorkspaceID string
+	UserID      string
+}
+
+// TokenPersistence makes the token lifecycle survive process restarts and
+// keeps revocation visible across backend instances.
+type TokenPersistence interface {
+	Put(context.Context, PersistedToken) error
+	Get(context.Context, string) (PersistedToken, bool, error)
+	Revoke(context.Context, string, time.Time) error
+}
+
+func WithTokenPersistence(persistence TokenPersistence) TokenStoreOption {
+	return func(store *TokenStore) {
+		store.persistence = persistence
+	}
+}
+
 type tokenRecord struct {
 	digest      [sha256.Size]byte
 	scopes      []Scope
@@ -74,11 +102,12 @@ type tokenRecord struct {
 // returned through IssuedToken.Reveal exactly once and cannot be recovered
 // from the store afterwards.
 type TokenStore struct {
-	mu     sync.RWMutex
-	tokens map[string]tokenRecord
-	clock  func() time.Time
-	random io.Reader
-	ttl    time.Duration
+	mu          sync.RWMutex
+	tokens      map[string]tokenRecord
+	clock       func() time.Time
+	random      io.Reader
+	ttl         time.Duration
+	persistence TokenPersistence
 }
 
 func NewTokenStore(options ...TokenStoreOption) *TokenStore {
@@ -171,19 +200,25 @@ func (store *TokenStore) issue(scopes []Scope, identity TokenIdentity) (IssuedTo
 		secret := base64.RawURLEncoding.EncodeToString(secretBytes)
 		digest := sha256.Sum256([]byte(secret))
 		expiresAt := now.Add(store.ttl)
-
-		store.mu.Lock()
-		if _, exists := store.tokens[id]; exists {
-			store.mu.Unlock()
-			continue
-		}
-		store.tokens[id] = tokenRecord{
+		record := tokenRecord{
 			digest:      digest,
 			scopes:      append([]Scope(nil), normalized...),
 			expiresAt:   expiresAt,
 			workspaceID: identity.WorkspaceID,
 			userID:      identity.UserID,
 		}
+		if store.persistence != nil {
+			if err := store.persistence.Put(context.Background(), persistedToken(id, record)); err != nil {
+				return IssuedToken{}, ErrTokenPersistence
+			}
+		}
+
+		store.mu.Lock()
+		if _, exists := store.tokens[id]; exists {
+			store.mu.Unlock()
+			continue
+		}
+		store.tokens[id] = record
 		store.mu.Unlock()
 
 		return IssuedToken{
@@ -240,6 +275,13 @@ func (principal Principal) RequireScope(scope Scope) error {
 // Verify checks a bearer token at the supplied time. Verification compares
 // digests with hmac.Equal rather than a normal byte comparison.
 func (store *TokenStore) Verify(token string, now time.Time) (Principal, error) {
+	return store.VerifyContext(context.Background(), token, now)
+}
+
+// VerifyContext is the request-aware form used by the HTTP transport. It
+// allows a persistent store to observe request cancellation while preserving
+// the compact Verify API used by protocol/unit callers.
+func (store *TokenStore) VerifyContext(ctx context.Context, token string, now time.Time) (Principal, error) {
 	id, secret, err := splitToken(token)
 	if err != nil {
 		return Principal{}, ErrInvalidToken
@@ -249,10 +291,8 @@ func (store *TokenStore) Verify(token string, now time.Time) (Principal, error) 
 	}
 	digest := sha256.Sum256([]byte(secret))
 
-	store.mu.RLock()
-	record, ok := store.tokens[id]
-	store.mu.RUnlock()
-	if !ok {
+	record, ok, loadErr := store.loadRecord(ctx, id)
+	if loadErr != nil || !ok {
 		return Principal{}, ErrInvalidToken
 	}
 	if !hmac.Equal(record.digest[:], digest[:]) {
@@ -318,31 +358,153 @@ func hasMCPDisallowedControl(value string, allowTextControls bool) bool {
 }
 
 func (store *TokenStore) VerifyAuthorization(header string, now time.Time) (Principal, error) {
+	return store.VerifyAuthorizationContext(context.Background(), header, now)
+}
+
+func (store *TokenStore) VerifyAuthorizationContext(ctx context.Context, header string, now time.Time) (Principal, error) {
 	parts := strings.Fields(header)
 	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
 		return Principal{}, ErrInvalidAuthorization
 	}
-	return store.Verify(parts[1], now)
+	return store.VerifyContext(ctx, parts[1], now)
 }
 
 // Revoke invalidates a token after verifying its secret. The clear token is
 // never retained by the store and is not included in any returned error.
 func (store *TokenStore) Revoke(token string) error {
+	return store.RevokeContext(context.Background(), token)
+}
+
+func (store *TokenStore) RevokeContext(ctx context.Context, token string) error {
 	id, secret, err := splitToken(token)
 	if err != nil {
 		return ErrInvalidToken
 	}
 	digest := sha256.Sum256([]byte(secret))
 
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	record, ok := store.tokens[id]
-	if !ok || !hmac.Equal(record.digest[:], digest[:]) {
+	record, ok, loadErr := store.loadRecord(ctx, id)
+	if loadErr != nil || !ok || !hmac.Equal(record.digest[:], digest[:]) {
 		return ErrInvalidToken
 	}
+	if store.persistence != nil {
+		if err := store.persistence.Revoke(ctx, id, store.now()); err != nil {
+			return ErrTokenPersistence
+		}
+	}
+	store.mu.Lock()
 	record.revoked = true
 	store.tokens[id] = record
+	store.mu.Unlock()
 	return nil
+}
+
+// RevokeByID invalidates a token from an authenticated management surface
+// without requiring the bearer secret to be sent back to the server. The
+// token ID is not a credential and is safe to use as the resource identifier;
+// the caller must still be authorized by the transport before invoking this
+// method.
+func (store *TokenStore) RevokeByID(id string) error {
+	return store.RevokeByIDContext(context.Background(), id)
+}
+
+func (store *TokenStore) RevokeByIDContext(ctx context.Context, id string) error {
+	if store == nil || !validMCPIdentifier(id, maxTokenIdentityLength, true) {
+		return ErrInvalidToken
+	}
+	record, ok, loadErr := store.loadRecord(ctx, id)
+	if loadErr != nil {
+		return ErrTokenPersistence
+	}
+	if !ok {
+		return ErrInvalidToken
+	}
+	if store.persistence != nil {
+		if err := store.persistence.Revoke(ctx, id, store.now()); err != nil {
+			return ErrTokenPersistence
+		}
+	}
+	store.mu.Lock()
+	record.revoked = true
+	store.tokens[id] = record
+	store.mu.Unlock()
+	return nil
+}
+
+// RevokeByIDForIdentity invalidates a token from an authenticated application
+// surface while preserving the token's workspace/user ownership boundary.
+// Token IDs are resource identifiers, not bearer credentials, but possession
+// of an ID must never allow one user to revoke another user's token.
+func (store *TokenStore) RevokeByIDForIdentity(id string, identity TokenIdentity) error {
+	return store.RevokeByIDForIdentityContext(context.Background(), id, identity)
+}
+
+func (store *TokenStore) RevokeByIDForIdentityContext(ctx context.Context, id string, identity TokenIdentity) error {
+	if store == nil || !validMCPIdentifier(id, maxTokenIdentityLength, true) || validateTokenIdentity(identity) != nil {
+		return ErrInvalidToken
+	}
+	record, ok, loadErr := store.loadRecord(ctx, id)
+	if loadErr != nil {
+		return ErrTokenPersistence
+	}
+	if !ok || record.workspaceID != identity.WorkspaceID || record.userID != identity.UserID {
+		return ErrInvalidToken
+	}
+	if store.persistence != nil {
+		if err := store.persistence.Revoke(ctx, id, store.now()); err != nil {
+			return ErrTokenPersistence
+		}
+	}
+	store.mu.Lock()
+	record.revoked = true
+	store.tokens[id] = record
+	store.mu.Unlock()
+	return nil
+}
+
+func (store *TokenStore) loadRecord(ctx context.Context, id string) (tokenRecord, bool, error) {
+	if store.persistence == nil {
+		store.mu.RLock()
+		record, ok := store.tokens[id]
+		store.mu.RUnlock()
+		return record, ok, nil
+	}
+	persisted, found, err := store.persistence.Get(ctx, id)
+	if err != nil || !found {
+		return tokenRecord{}, found, err
+	}
+	record, err := tokenRecordFromPersisted(persisted)
+	if err != nil {
+		return tokenRecord{}, false, err
+	}
+	store.mu.Lock()
+	store.tokens[id] = record
+	store.mu.Unlock()
+	return record, true, nil
+}
+
+func persistedToken(id string, record tokenRecord) PersistedToken {
+	return PersistedToken{
+		ID:          id,
+		Digest:      append([]byte(nil), record.digest[:]...),
+		Scopes:      append([]Scope(nil), record.scopes...),
+		ExpiresAt:   record.expiresAt,
+		Revoked:     record.revoked,
+		WorkspaceID: record.workspaceID,
+		UserID:      record.userID,
+	}
+}
+
+func tokenRecordFromPersisted(token PersistedToken) (tokenRecord, error) {
+	if len(token.Digest) != sha256.Size || token.ExpiresAt.IsZero() || (token.WorkspaceID == "") != (token.UserID == "") {
+		return tokenRecord{}, ErrTokenPersistence
+	}
+	scopes, err := ParseScopeList(scopeStrings(token.Scopes))
+	if err != nil {
+		return tokenRecord{}, ErrTokenPersistence
+	}
+	var digest [sha256.Size]byte
+	copy(digest[:], token.Digest)
+	return tokenRecord{digest: digest, scopes: scopes, expiresAt: token.ExpiresAt, revoked: token.Revoked, workspaceID: token.WorkspaceID, userID: token.UserID}, nil
 }
 
 func (store *TokenStore) now() time.Time {

@@ -50,7 +50,7 @@ The Vietnamese fallback percentage was removed from API/domain/UI models because
 
 Date: 2026-08-22
 
-PostgreSQL init scripts cover a new volume, while `scripts/db_migrate.sh` applies the ordered SQL files to an existing database with one transaction per migration and verifies the version row. `scripts/db_backup.sh` uses a private custom-format dump; `scripts/db_restore.sh` requires `CONFIRM_RESTORE=YES`, an exact `CONFIRM_RESTORE_TARGET` database name and a live `current_database()` match before restoring. Production additionally requires an explicit allow flag.
+Local PostgreSQL init scripts cover a new development volume. Production Compose has no init-directory mount; `scripts/db_migrate.sh` is the sole production migration path and applies the ordered SQL files with one transaction per migration while verifying the version row. `scripts/db_backup.sh` uses a private custom-format dump; `scripts/db_restore.sh` requires `CONFIRM_RESTORE=YES`, an exact `CONFIRM_RESTORE_TARGET` database name and a live `current_database()` match before restoring. Production additionally requires an explicit allow flag.
 
 ## D-008 — HTTPS requires a real deployment target
 

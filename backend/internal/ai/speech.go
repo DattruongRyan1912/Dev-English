@@ -17,6 +17,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/connectors"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
 )
 
@@ -470,6 +471,5 @@ func silentWAV() []byte {
 }
 
 func providerHTTPError(name string, resp *http.Response) error {
-	payload, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-	return fmt.Errorf("%s returned HTTP %d: %s", name, resp.StatusCode, strings.TrimSpace(string(payload)))
+	return connectors.NewProviderError(name, "request", resp.StatusCode, "provider request failed")
 }

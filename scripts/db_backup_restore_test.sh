@@ -64,6 +64,19 @@ expected_migrations="
 004_platform_safety.sql
 005_knowledge.sql
 006_work.sql
+007_assistant_s1.sql
+008_knowledge_root_fks.sql
+009_knowledge_evidence_trigger_repair.sql
+010_connector_sync.sql
+011_usage_accounting.sql
+012_action_receipt_hash.sql
+013_learning_overlay.sql
+014_workspace_backfill.sql
+015_usage_reservations.sql
+016_mcp_tokens.sql
+017_workspace_scoped_challenge_identity.sql
+018_assistant_conversation_context.sql
+019_platform_constraint_repair.sql
 "
 while IFS= read -r migration_name; do
   [[ -z "$migration_name" ]] && continue
@@ -78,7 +91,13 @@ for migration_path in "$migrations_dir"/*.sql; do
   case "$migration_name" in
     000_schema_migrations.sql|001_initial.sql|002_provider_secrets.sql|\
     003_platform_foundation.sql|004_platform_safety.sql|005_knowledge.sql|\
-    006_work.sql)
+    006_work.sql|007_assistant_s1.sql|008_knowledge_root_fks.sql|\
+    009_knowledge_evidence_trigger_repair.sql|010_connector_sync.sql|\
+    011_usage_accounting.sql|012_action_receipt_hash.sql|\
+    013_learning_overlay.sql|014_workspace_backfill.sql|\
+    015_usage_reservations.sql|016_mcp_tokens.sql|\
+    017_workspace_scoped_challenge_identity.sql|\
+    018_assistant_conversation_context.sql|019_platform_constraint_repair.sql)
       ;;
     *)
       fail "Unexpected migration in the recovery chain: $migration_name" 1
@@ -721,7 +740,7 @@ WITH required(kind, object_name) AS (
     ('index', 'work_idempotency_scope_created_idx'),
     ('index', 'action_challenges_user_status_idx'),
     ('index', 'action_challenges_workspace_expiry_idx'),
-    ('index', 'action_challenges_pending_hash_uidx'),
+    ('index', 'action_challenges_pending_workspace_hash_uidx'),
     ('index', 'action_receipts_workspace_created_idx'),
     ('index', 'action_receipts_user_created_idx'),
     ('index', 'action_receipts_active_idempotency_uidx'),
@@ -754,9 +773,9 @@ FROM checked;
 SQL
 }
 
-schema_expected='000_schema_migrations.sql,001_initial.sql,002_provider_secrets.sql,003_platform_foundation.sql,004_platform_safety.sql,005_knowledge.sql,006_work.sql'
+schema_expected='000_schema_migrations.sql,001_initial.sql,002_provider_secrets.sql,003_platform_foundation.sql,004_platform_safety.sql,005_knowledge.sql,006_work.sql,007_assistant_s1.sql,008_knowledge_root_fks.sql,009_knowledge_evidence_trigger_repair.sql,010_connector_sync.sql,011_usage_accounting.sql,012_action_receipt_hash.sql,013_learning_overlay.sql,014_workspace_backfill.sql,015_usage_reservations.sql,016_mcp_tokens.sql,017_workspace_scoped_challenge_identity.sql,018_assistant_conversation_context.sql,019_platform_constraint_repair.sql'
 if [[ "$(schema_versions "$postgres_db")" != "$schema_expected" ]]; then
-  fail 'Source schema_migrations does not contain the exact 000..006 chain.' 1
+  fail 'Source schema_migrations does not contain the exact 000..019 chain.' 1
 fi
 assert_data_invariants "$postgres_db"
 source_objects="$(required_objects "$postgres_db")"
@@ -852,7 +871,7 @@ if [[ "$restore_total" != "$restore_present" ]]; then
   fail "Restored schema objects are incomplete: $restore_present/$restore_total." 1
 fi
 if [[ "$(schema_versions "$restore_db")" != "$schema_expected" ]]; then
-  fail 'Restored schema_migrations does not contain the exact 000..006 chain.' 1
+  fail 'Restored schema_migrations does not contain the exact 000..019 chain.' 1
 fi
 
 second_migration_output="$(run_migrate "$restore_db" 2>/dev/null)"

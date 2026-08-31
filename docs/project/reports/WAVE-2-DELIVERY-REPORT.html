@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dev-English — Wave 2 Delivery Report</title>
+  <style>
+    :root { color-scheme: light; --ink:#18212f; --muted:#607086; --line:#dbe3ec; --panel:#fff; --bg:#f4f7fb; --blue:#1d66d8; --green:#16834b; --amber:#a15c00; --red:#a12622; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:1120px; margin:0 auto; padding:36px 22px 64px; }
+    header { background:linear-gradient(135deg,#132d50,#1d66d8); color:#fff; border-radius:18px; padding:30px 32px; box-shadow:0 10px 28px #16345a22; }
+    h1 { margin:0 0 6px; font-size:30px; letter-spacing:-.02em; }
+    h2 { margin:30px 0 12px; font-size:20px; }
+    h3 { margin:0 0 5px; font-size:16px; }
+    p { margin:8px 0; }
+    .meta { color:#dceaff; }
+    .status { display:inline-block; margin-top:18px; padding:7px 12px; border-radius:999px; background:#d9ffe9; color:#0b6339; font-weight:700; font-size:13px; }
+    .grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:18px 0; }
+    .card, section { background:var(--panel); border:1px solid var(--line); border-radius:14px; box-shadow:0 3px 12px #203a5d0a; }
+    .card { padding:16px; }
+    .card strong { display:block; font-size:17px; }
+    .approved { color:var(--green); }
+    .warning { color:var(--amber); }
+    .blocked { color:var(--red); }
+    .status.blocked { background:#ffe2df; color:#8b211d; }
+    section { padding:20px 22px; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { border-bottom:1px solid var(--line); padding:10px 8px; text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+    tr:last-child td { border-bottom:0; }
+    code { background:#eef3f8; border-radius:5px; padding:2px 5px; font:13px ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; }
+    ul { margin:8px 0 0 20px; padding:0; }
+    li { margin:5px 0; }
+    .small { color:var(--muted); font-size:13px; }
+    .pill { white-space:nowrap; font-weight:700; }
+    a { color:var(--blue); }
+    footer { color:var(--muted); margin-top:22px; font-size:13px; }
+    @media (max-width:760px) { main { padding:18px 12px 40px; } header { padding:24px 20px; } h1 { font-size:24px; } .grid { grid-template-columns:repeat(2,1fr); } table { display:block; overflow-x:auto; white-space:normal; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Dev-English — Báo cáo triển khai Wave 2</h1>
+    <p class="meta">Phạm vi: Wave 2 integration · cập nhật 2026-08-26 10:10 UTC</p>
+    <span class="status blocked">INTEGRATION BLOCKED · SOL R7 REVIEWED · NOT COMMITTED</span>
+  </header>
+
+  <div class="grid" aria-label="Wave 2 status">
+    <div class="card"><strong class="approved">APPROVED</strong><span>TASK-003-R1 Knowledge</span><p class="small">Sol R5</p></div>
+    <div class="card"><strong class="approved">APPROVED</strong><span>TASK-004-R1 Work</span><p class="small">Sol R5</p></div>
+    <div class="card"><strong class="approved">APPROVED</strong><span>TASK-005-R2 Connectors</span><p class="small">Sol R6</p></div>
+    <div class="card"><strong class="approved">APPROVED</strong><span>TASK-007A-R1 MCP</span><p class="small">Sol R4</p></div>
+  </div>
+
+  <section>
+    <h2>Kết quả chính</h2>
+    <p>Đã hoàn thiện repair của Connectors trong worktree riêng và được Sol Ultra review độc lập với verdict <strong>APPROVED</strong>. Hai finding mức HIGH của R5 đã được xử lý:</p>
+    <ul>
+      <li>Dedup revision của Drive/GitHub nhận <code>workspaceID</code>, chuẩn hóa identity và tạo khóa lưu trữ theo workspace.</li>
+      <li>GitHub safe-write atomically reserve receipt <code>pending</code> trước provider call; các trạng thái <code>pending</code>/<code>uncertain</code> chặn invocation lặp ở service khác.</li>
+      <li>Provider failure được chuyển thành trạng thái fail-closed <code>uncertain</code>, vẫn giữ retry classification và redaction.</li>
+    </ul>
+  </section>
+
+  <h2>Trạng thái integration</h2>
+  <section>
+    <p>Đã stage đúng 32 file của bốn cone Wave 2 đã được approved vào branch riêng <code>integration/wave-2</code>. Canonical checkout và WIP của người dùng không bị copy hoặc ghi đè.</p>
+    <p><strong>Worktree:</strong> <code>/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-2-integration</code></p>
+    <p><strong>Base:</strong> <code>d39019abb93b333654b14e068a1ae0d476b1cae2</code> · <strong>Commit/push/merge/deploy:</strong> chưa được cấp quyền.</p>
+    <p class="blocked"><strong>BLOCKER:</strong> integration branch không có migration tạo bảng <code>workspaces</code>. Cả <code>005_knowledge.sql</code> và <code>006_work.sql</code> đều phụ thuộc vào <code>003_platform_foundation.sql</code>; fresh migration chain vì vậy chưa runnable.</p>
+    <p>Canonical checkout có <code>003_platform_foundation.sql</code> và <code>004_platform_safety.sql</code> nhưng đang là WIP ngoài cone được cấp quyền. Cần human authorization trước khi đưa chúng vào target hoặc rebase onto target phù hợp.</p>
+    <p>Evidence: <a href="../agent-runs/WAVE-2-INTEGRATION-R7.md">WAVE-2-INTEGRATION-R7.md</a> · <a href="../agent-runs/WAVE-2.json">WAVE-2.json</a>.</p>
+  </section>
+
+  <h2>File đã triển khai</h2>
+  <section>
+    <p>Integration worktree: <code>/Users/ryantruong/Project/Orther/.worktrees/Dev-English-WAVE-2-integration</code></p>
+    <p>Base: <code>d39019abb93b333654b14e068a1ae0d476b1cae2</code>. Có đúng 32 file staged trong các cone Knowledge, Work, Connectors, MCP và hai migration 005/006. Bảng dưới đây mô tả phần Connectors repair đã được đưa vào integration:</p>
+    <table>
+      <thead><tr><th>Nhóm</th><th>File</th><th>Mục đích</th></tr></thead>
+      <tbody>
+        <tr><td>Contract/store</td><td><code>sync.go</code>, <code>fakes.go</code>, <code>errors.go</code></td><td>Workspace-scoped revision APIs, reference stores, pending/uncertain errors và redaction.</td></tr>
+        <tr><td>Safe write</td><td><code>safe_write.go</code></td><td>Pre-provider reservation, replay decision, monotonic receipt finalization.</td></tr>
+        <tr><td>Regression tests</td><td><code>sync_service_test.go</code>, <code>safe_write_service_test.go</code>, <code>coverage_edges_test.go</code></td><td>Cross-workspace, cross-service, provider failure, finalize failure, concurrency và edge cases.</td></tr>
+        <tr><td>Existing cone tests</td><td><code>contracts.go</code>, <code>contracts_test.go</code></td><td>Giữ contract và hành vi connector đã có trong worktree worker.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <h2>Acceptance evidence</h2>
+  <section>
+    <table>
+      <thead><tr><th>Tiêu chí</th><th>Bằng chứng đã kiểm tra</th><th>Kết quả</th></tr></thead>
+      <tbody>
+        <tr><td>Workspace isolation</td><td><code>sync.go:47</code>, <code>sync.go:243</code>, <code>sync.go:403</code>; test tại <code>sync_service_test.go:55</code> và <code>:227</code>.</td><td class="pill approved">Đạt</td></tr>
+        <tr><td>Reservation trước mutation</td><td><code>safe_write.go:269</code> và <code>:408</code> gọi <code>Reserve</code> trước provider invocation tại <code>:418</code>.</td><td class="pill approved">Đạt</td></tr>
+        <tr><td>Không duplicate sau finalize failure</td><td><code>safe_write_service_test.go:332</code> dùng hai service và một store dùng chung; service thứ hai không gọi provider.</td><td class="pill approved">Đạt</td></tr>
+        <tr><td>Uncertain provider outcome</td><td><code>safe_write_service_test.go:372</code> kiểm tra redaction, classification và retry bị chặn.</td><td class="pill approved">Đạt</td></tr>
+        <tr><td>File-cone / isolation</td><td>Integration branch giữ đúng base; 32 file staged chỉ trong sáu path cone đã duyệt; các cone byte-identical với frozen worker worktrees.</td><td class="pill approved">Đạt</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <h2>Quality gates</h2>
+  <section>
+    <table>
+      <thead><tr><th>Kiểm tra</th><th>Kết quả thực tế</th></tr></thead>
+      <tbody>
+        <tr><td>Focused race + coverage</td><td>Exit 0; 304 pass, 2 PostgreSQL tests skip. Knowledge 96.3%, Work 93.3%, Connectors 91.5%, MCP 95.3%.</td></tr>
+        <tr><td>Repository test</td><td><code>go test -mod=readonly -count=1 ./...</code> exit 0; 351 pass, 3 skip.</td></tr>
+        <tr><td>Focused/repository vet</td><td>Exit 0.</td></tr>
+        <tr><td><code>gofmt -d</code></td><td>Exit 0, không có output.</td></tr>
+        <tr><td>Staged diff / cone comparison</td><td>Exit 0; diff-check và năm so sánh với frozen worker cones đều sạch.</td></tr>
+        <tr><td>Protocol manifest</td><td><code>scripts/verify_multi_agent_protocol.sh</code>: PASS protocol, entrypoints, manifests.</td></tr>
+        <tr><td>PostgreSQL migration runtime</td><td class="warning">Chưa chạy: test database URL và <code>COMPOSE_FILE</code> chưa cấu hình; không dùng shared database. Ngoài ra branch đang thiếu migration 003.</td></tr>
+      </tbody>
+    </table>
+    <p class="small">Coverage và test count ở trên là kết quả Sol Ultra chạy độc lập trên integration worktree. Aggregate 93.5% trước đó không được dùng làm bằng chứng R7 vì không được tái tính trong reviewer run.</p>
+  </section>
+
+  <h2>Sol Ultra review</h2>
+  <section>
+    <p><strong>Reviewer:</strong> Huygens · <code>01a03c8f-5f2d-7833-ad4c-94557dcca88f</code></p>
+    <p><strong>Cycle:</strong> WAVE-2-REVIEW-R7 · <strong>turn:</strong> <code>01a03d80-e5df-7342-bbae-fc82dc25a9ef</code></p>
+    <p><strong>Verdict:</strong> <span class="blocked"><strong>BLOCKED</strong></span>. Sol xác nhận file cone, source, tests, security boundary và static gates không có finding mức blocking/high/medium khác; nhưng migration chain tích hợp thiếu migration tạo <code>workspaces</code>, nên branch chưa sẵn sàng cho commit hoặc release gate.</p>
+    <p>Đây là blocker dependency/authorization được suy ra từ source và thứ tự migration, chưa phải lỗi PostgreSQL runtime đã chạy. Evidence: <a href="../agent-runs/WAVE-2-INTEGRATION-R7.md">WAVE-2-INTEGRATION-R7.md</a> · <a href="../agent-runs/WAVE-2.json">WAVE-2.json</a>.</p>
+  </section>
+
+  <h2>Giới hạn chưa kiểm chứng</h2>
+  <section>
+    <ul>
+      <li>Chưa gọi live Drive hoặc GitHub provider.</li>
+      <li>Cone này chưa có PostgreSQL receipt adapter production; atomicity được kiểm tra qua contract và reference in-memory store, chưa phải database thật.</li>
+      <li>Canonical checkout có pre-existing dirty WIP, trong đó migration 003/004 là WIP nền tảng. Không copy hoặc ghi đè WIP đó.</li>
+      <li>Đã stage vào integration branch nhưng chưa commit; push, merge và deploy chưa được cấp quyền.</li>
+    </ul>
+  </section>
+
+  <h2>Bước tiếp theo</h2>
+  <section>
+    <p>Wave 2 hiện ở trạng thái <strong>blocked</strong>. Cần human authorization cho đúng migration nền tảng sở hữu <code>workspaces</code> (hoặc một integration target đã được phép chứa migration đó), sau đó chạy migration chain trên PostgreSQL cô lập và gọi lại Sol Ultra review R8.</p>
+    <p>Changelog và durable run state đã được cập nhật tại <a href="../../../changelog.md">changelog.md</a>, <a href="../agent-runs/WAVE-2.json">WAVE-2.json</a> và <a href="../agent-runs/WAVE-2-INTEGRATION-R7.md">WAVE-2-INTEGRATION-R7.md</a>.</p>
+  </section>
+
+  <footer>Báo cáo này chỉ phản ánh evidence đã kiểm tra trong phiên hiện tại; không coi trạng thái reviewer là quyền merge/push/deploy.</footer>
+</main>
+</body>
+</html>

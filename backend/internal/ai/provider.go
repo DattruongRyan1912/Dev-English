@@ -12,11 +12,18 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/connectors"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
 )
 
 var ErrProviderUnavailable = errors.New("ai provider unavailable")
+
+const (
+	maxProviderJSONAttempts = 3
+	providerRetryBaseDelay  = 50 * time.Millisecond
+)
 
 type MissionRequest struct {
 	LearningState domain.LearningState
@@ -35,8 +42,9 @@ type RoleplayRequest struct {
 }
 
 type RoleplayResult struct {
-	Reply      string
-	Evaluation domain.Evaluation
+	Reply        string
+	Evaluation   domain.Evaluation
+	GuidanceOnly bool
 }
 
 type CopilotRequest struct {
@@ -53,6 +61,42 @@ type LLMProvider interface {
 
 // Provider is kept as a concise alias for the learning service dependency.
 type Provider = LLMProvider
+
+// JSONUsage is the provider-reported accounting payload for one structured
+// generation. Available is false when the upstream response did not include
+// usage; callers must not silently turn an unavailable value into an estimate.
+type JSONUsage struct {
+	InputTokens  int    `json:"inputTokens"`
+	OutputTokens int    `json:"outputTokens"`
+	TotalTokens  int    `json:"totalTokens"`
+	Available    bool   `json:"available"`
+	Model        string `json:"-"`
+}
+
+// JSONGenerator is the narrow provider boundary used by the grounded
+// assistant. The application owns model selection and output validation; the
+// provider only returns JSON plus the usage metadata it actually received.
+type JSONGenerator interface {
+	GenerateJSON(context.Context, string, string, string, any) (JSONUsage, error)
+}
+
+// These optional interfaces let legacy learning features persist provider-
+// reported usage without estimating tokens from word counts.
+type UsageAwareMissionProvider interface {
+	GenerateMissionWithUsage(context.Context, MissionRequest) (domain.Mission, JSONUsage, error)
+}
+
+type UsageAwareWritingProvider interface {
+	EvaluateWritingWithUsage(context.Context, WritingRequest) (domain.Evaluation, JSONUsage, error)
+}
+
+type UsageAwareRoleplayProvider interface {
+	GenerateRoleplayWithUsage(context.Context, RoleplayRequest) (RoleplayResult, JSONUsage, error)
+}
+
+type UsageAwareCopilotProvider interface {
+	GenerateCopilotWithUsage(context.Context, CopilotRequest) (domain.CopilotResult, JSONUsage, error)
+}
 
 // HealthChecker is implemented by providers that can perform a cheap,
 // authenticated connectivity probe without consuming a generation quota.
@@ -159,6 +203,10 @@ func (p DeterministicProvider) EvaluateWriting(_ context.Context, request Writin
 
 func (p DeterministicProvider) GenerateRoleplay(_ context.Context, request RoleplayRequest) (RoleplayResult, error) {
 	answer := strings.TrimSpace(request.Answer)
+	guidanceOnly := isAdaptiveRoleplayAnswer(answer)
+	if guidanceOnly {
+		return adaptiveRoleplayResult(request.Scenario), nil
+	}
 	mission := domain.Mission{Skill: "meeting", SkillLabel: "Technical Discussion", Level: request.Scenario.Level, Context: request.Scenario.Context, Prompt: request.Scenario.Goal, ExpectedPoints: []string{"reason", "impact", "next step"}}
 	evaluation := EvaluateWritingDeterministically(mission, answer)
 	reply := "That makes sense. Can you explain the evidence and the next step you would take?"
@@ -171,7 +219,95 @@ func (p DeterministicProvider) GenerateRoleplay(_ context.Context, request Rolep
 	case strings.Contains(lower, "next") || strings.Contains(lower, "fix"):
 		reply = "Good. How will you communicate the result and prevent the same issue from recurring?"
 	}
-	return RoleplayResult{Reply: reply, Evaluation: evaluation}, nil
+	return RoleplayResult{Reply: reply, Evaluation: evaluation, GuidanceOnly: guidanceOnly}, nil
+}
+
+func isAdaptiveRoleplayAnswer(answer string) bool {
+	return containsVietnameseText(answer) || containsRoleplayHelpRequest(answer)
+}
+
+func containsVietnameseText(value string) bool {
+	const vietnameseDiacritics = "àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ"
+	for _, char := range strings.ToLower(value) {
+		if strings.ContainsRune(vietnameseDiacritics, char) {
+			return true
+		}
+	}
+	normalized := normalizeRoleplayText(value)
+	markers := map[string]struct{}{
+		"anh": {}, "ban": {}, "biet": {}, "cach": {}, "can": {},
+		"chua": {}, "duoc": {}, "em": {}, "giai": {}, "giup": {},
+		"goi": {}, "huong": {}, "khong": {}, "loi": {}, "minh": {},
+		"muon": {}, "nao": {}, "noi": {}, "the": {}, "thich": {},
+		"tieng": {}, "toi": {}, "tra": {}, "tro": {}, "xin": {}, "y": {},
+	}
+	strongMarkers := map[string]struct{}{
+		"biet": {}, "chua": {}, "duoc": {}, "giai": {}, "giup": {},
+		"huong": {}, "khong": {}, "loi": {}, "minh": {}, "muon": {},
+		"thich": {}, "tieng": {}, "toi": {}, "tra": {}, "tro": {}, "xin": {},
+	}
+	count := 0
+	strongCount := 0
+	for _, word := range strings.Fields(normalized) {
+		if _, ok := markers[word]; ok {
+			count++
+		}
+		if _, ok := strongMarkers[word]; ok {
+			strongCount++
+		}
+	}
+	return count >= 3 || strongCount >= 1 && count >= 2
+}
+
+func containsRoleplayHelpRequest(value string) bool {
+	normalized := normalizeRoleplayText(value)
+	for _, phrase := range []string{
+		"help me", "please help", "need help", "can you help", "could you help",
+		"guidance", "guide me", "give me a hint", "what should i say",
+		"what can i say", "how should i answer", "how do i answer", "how can i answer",
+		"can you explain", "could you explain", "please explain", "i am stuck", "i m stuck",
+		"not sure how", "do not know how", "dont know how", "don t know how",
+	} {
+		if strings.Contains(normalized, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeRoleplayText(value string) string {
+	return strings.Map(func(char rune) rune {
+		if unicode.IsLetter(char) || unicode.IsSpace(char) {
+			return unicode.ToLower(char)
+		}
+		return ' '
+	}, value)
+}
+
+func adaptiveRoleplayResult(scenario domain.RoleplayScenario) RoleplayResult {
+	explanation := "Câu hỏi yêu cầu bạn nêu ý chính và thêm một chi tiết kỹ thuật."
+	starter := "I think we should start with the main issue."
+	question := "What happened first?"
+	switch strings.ToLower(strings.TrimSpace(scenario.Type)) {
+	case "technical-interview":
+		explanation = "Câu hỏi yêu cầu bạn nêu cách tiếp cận đầu tiên khi thiết kế API và làm rõ các yêu cầu."
+		starter = "I would start by clarifying the requirements."
+		question = "What should the solution do?"
+	case "system-design":
+		explanation = "Câu hỏi yêu cầu bạn xác định ràng buộc chính trước khi chọn thiết kế."
+		starter = "I would start with the main system constraint."
+		question = "What must the system handle?"
+	}
+	return RoleplayResult{
+		Reply: explanation + "\n" + starter + "\n" + question,
+		Evaluation: domain.Evaluation{
+			Summary:    "Bạn chưa cung cấp câu trả lời kỹ thuật bằng tiếng Anh.",
+			MainIssue:  "Chưa có câu trả lời tiếng Anh để đánh giá.",
+			NextAction: "Reuse the starter sentence and add one detail about the situation.",
+			Provider:   "deterministic-fallback",
+		},
+		GuidanceOnly: true,
+	}
 }
 
 func (p DeterministicProvider) GenerateCopilot(_ context.Context, request CopilotRequest) (domain.CopilotResult, error) {
@@ -388,6 +524,18 @@ func (p *DeepSeekProvider) models() (string, string) {
 	return p.FastModel, p.SmartModel
 }
 
+// FastModelName and SmartModelName expose the configured routing names to the
+// application layer without exposing the provider's mutable configuration.
+func (p *DeepSeekProvider) FastModelName() string {
+	fast, _ := p.models()
+	return strings.TrimSpace(fast)
+}
+
+func (p *DeepSeekProvider) SmartModelName() string {
+	_, smart := p.models()
+	return strings.TrimSpace(smart)
+}
+
 func (p *DeepSeekProvider) SetAPIKey(value string) {
 	p.configMu.Lock()
 	p.APIKey = strings.TrimSpace(value)
@@ -504,17 +652,23 @@ func (p *DeepSeekProvider) ProbeCapability(ctx context.Context, capability strin
 }
 
 func (p *DeepSeekProvider) GenerateMission(ctx context.Context, request MissionRequest) (domain.Mission, error) {
+	result, _, err := p.GenerateMissionWithUsage(ctx, request)
+	return result, err
+}
+
+func (p *DeepSeekProvider) GenerateMissionWithUsage(ctx context.Context, request MissionRequest) (domain.Mission, JSONUsage, error) {
 	if !p.Configured() {
-		return domain.Mission{}, ErrProviderUnavailable
+		return domain.Mission{}, JSONUsage{}, ErrProviderUnavailable
 	}
 	fastModel, _ := p.models()
 	system := "You are DevEnglish's mission generator. Return only valid JSON with title, mode, skill, skillLabel, level, context, prompt, targetVocabulary, expectedPoints, estimatedMinutes. Keep the mission practical for a developer."
 	user := fmt.Sprintf("Learning state: %+v\nWork context: %s", request.LearningState, request.WorkContext)
 	var result domain.Mission
+	var usage JSONUsage
 	var err error
 	for attempt := 0; attempt < 2; attempt++ {
 		result = domain.Mission{}
-		err = p.chatJSON(ctx, fastModel, system, user, &result)
+		usage, err = p.GenerateJSON(ctx, fastModel, system, user, &result)
 		if err == nil {
 			err = validateMission(result)
 		}
@@ -523,26 +677,32 @@ func (p *DeepSeekProvider) GenerateMission(ctx context.Context, request MissionR
 		}
 	}
 	if err != nil {
-		return domain.Mission{}, fmt.Errorf("validate generated mission: %w", err)
+		return domain.Mission{}, JSONUsage{}, fmt.Errorf("validate generated mission: %w", err)
 	}
 	result.ID = "mission-ai-" + fmt.Sprintf("%d", time.Now().UTC().UnixNano())
 	result.Status = "available"
 	result.CreatedAt = time.Now().UTC()
-	return result, nil
+	return result, usage, nil
 }
 
 func (p *DeepSeekProvider) EvaluateWriting(ctx context.Context, request WritingRequest) (domain.Evaluation, error) {
+	result, _, err := p.EvaluateWritingWithUsage(ctx, request)
+	return result, err
+}
+
+func (p *DeepSeekProvider) EvaluateWritingWithUsage(ctx context.Context, request WritingRequest) (domain.Evaluation, JSONUsage, error) {
 	if !p.Configured() {
-		return domain.Evaluation{}, ErrProviderUnavailable
+		return domain.Evaluation{}, JSONUsage{}, ErrProviderUnavailable
 	}
 	_, smartModel := p.models()
 	system := "You are a technical English evaluator. Return only valid JSON with score, summary, whatWasGood, mainIssue, nextAction, corrections, technicalPoints. Corrections must contain original, corrected, why, type, severity. Score is an observation only; do not invent missing evidence."
 	user := fmt.Sprintf("Mission: %+v\nLearner answer: %s", request.Mission, request.Answer)
 	var result domain.Evaluation
+	var usage JSONUsage
 	var err error
 	for attempt := 0; attempt < 2; attempt++ {
 		result = domain.Evaluation{}
-		err = p.chatJSON(ctx, smartModel, system, user, &result)
+		usage, err = p.GenerateJSON(ctx, smartModel, system, user, &result)
 		if err == nil {
 			err = validateEvaluation(result)
 		}
@@ -551,18 +711,24 @@ func (p *DeepSeekProvider) EvaluateWriting(ctx context.Context, request WritingR
 		}
 	}
 	if err != nil {
-		return domain.Evaluation{}, fmt.Errorf("validate generated evaluation: %w", err)
+		return domain.Evaluation{}, JSONUsage{}, fmt.Errorf("validate generated evaluation: %w", err)
 	}
 	result.Provider = p.Name()
-	return result, nil
+	return result, usage, nil
 }
 
 func (p *DeepSeekProvider) GenerateRoleplay(ctx context.Context, request RoleplayRequest) (RoleplayResult, error) {
+	result, _, err := p.GenerateRoleplayWithUsage(ctx, request)
+	return result, err
+}
+
+func (p *DeepSeekProvider) GenerateRoleplayWithUsage(ctx context.Context, request RoleplayRequest) (RoleplayResult, JSONUsage, error) {
 	if !p.Configured() {
-		return RoleplayResult{}, ErrProviderUnavailable
+		return RoleplayResult{}, JSONUsage{}, ErrProviderUnavailable
 	}
+	guidanceOnly := isAdaptiveRoleplayAnswer(request.Answer)
 	_, smartModel := p.models()
-	system := "You are a technical English roleplay partner. Return only JSON with reply and evaluation. The reply must ask one focused follow-up question. The evaluation must contain score, summary, whatWasGood, mainIssue, nextAction, corrections, technicalPoints."
+	system := "You are an adaptive technical English roleplay partner. Return only valid JSON with reply and evaluation. First inspect the learner answer. If it is Vietnamese or asks for help or guidance, reply with a brief Vietnamese explanation, exactly one simple English starter sentence that is immediately usable, and one short, easy follow-up question. In that adaptive case, do not pretend that the learner supplied a technical answer: the evaluation must reflect that no technical answer was supplied, and nextAction must tell the learner to reuse the starter sentence and add one detail. Otherwise, continue the roleplay normally in English and evaluate only evidence the learner actually supplied. Adapt the vocabulary, sentence complexity, starter sentence and follow-up difficulty to the scenario level. The reply must ask one focused follow-up question. The evaluation must contain score, summary, whatWasGood, mainIssue, nextAction, corrections, technicalPoints."
 	user := fmt.Sprintf("Scenario: %+v\nConversation: %+v\nLearner answer: %s", request.Scenario, request.Conversation, request.Answer)
 	var output struct {
 		Reply      string            `json:"reply"`
@@ -574,7 +740,8 @@ func (p *DeepSeekProvider) GenerateRoleplay(ctx context.Context, request Rolepla
 			Reply      string            `json:"reply"`
 			Evaluation domain.Evaluation `json:"evaluation"`
 		}{}
-		lastErr = p.chatJSON(ctx, smartModel, system, user, &output)
+		var usage JSONUsage
+		usage, lastErr = p.GenerateJSON(ctx, smartModel, system, user, &output)
 		if lastErr == nil && strings.TrimSpace(output.Reply) == "" {
 			lastErr = errors.New("roleplay provider returned an empty reply")
 		}
@@ -586,54 +753,88 @@ func (p *DeepSeekProvider) GenerateRoleplay(ctx context.Context, request Rolepla
 		}
 		if lastErr == nil {
 			output.Evaluation.Provider = p.Name()
-			return RoleplayResult{Reply: output.Reply, Evaluation: output.Evaluation}, nil
+			return RoleplayResult{Reply: output.Reply, Evaluation: output.Evaluation, GuidanceOnly: guidanceOnly}, usage, nil
 		}
 	}
-	return RoleplayResult{}, fmt.Errorf("validate generated roleplay: %w", lastErr)
+	return RoleplayResult{}, JSONUsage{}, fmt.Errorf("validate generated roleplay: %w", lastErr)
 }
 
 func (p *DeepSeekProvider) GenerateCopilot(ctx context.Context, request CopilotRequest) (domain.CopilotResult, error) {
+	result, _, err := p.GenerateCopilotWithUsage(ctx, request)
+	return result, err
+}
+
+func (p *DeepSeekProvider) GenerateCopilotWithUsage(ctx context.Context, request CopilotRequest) (domain.CopilotResult, JSONUsage, error) {
 	if !p.Configured() {
-		return domain.CopilotResult{}, ErrProviderUnavailable
+		return domain.CopilotResult{}, JSONUsage{}, ErrProviderUnavailable
 	}
 	fastModel, _ := p.models()
 	system := "You are a technical English copilot for developers. Return only JSON with simple, natural, professional and explanation. Preserve the requested meaning and do not invent technical facts."
 	user := fmt.Sprintf("Vietnamese request: %s\nWork context: %s", request.Vietnamese, request.Context)
 	var output domain.CopilotResult
+	var usage JSONUsage
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
 		output = domain.CopilotResult{}
-		lastErr = p.chatJSON(ctx, fastModel, system, user, &output)
+		usage, lastErr = p.GenerateJSON(ctx, fastModel, system, user, &output)
 		if lastErr == nil && (strings.TrimSpace(output.Simple) == "" || strings.TrimSpace(output.Natural) == "" || strings.TrimSpace(output.Professional) == "") {
 			lastErr = errors.New("copilot provider returned incomplete output")
 		}
 		if lastErr == nil {
-			return output, nil
+			return output, usage, nil
 		}
 	}
-	return domain.CopilotResult{}, fmt.Errorf("validate generated copilot: %w", lastErr)
+	return domain.CopilotResult{}, JSONUsage{}, fmt.Errorf("validate generated copilot: %w", lastErr)
 }
 
-func (p *DeepSeekProvider) chatJSON(ctx context.Context, model, system, user string, output any) error {
+func (p *DeepSeekProvider) GenerateJSON(ctx context.Context, model, system, user string, output any) (JSONUsage, error) {
+	if !p.Configured() {
+		return JSONUsage{}, ErrProviderUnavailable
+	}
+	if err := ValidateModelName(model); err != nil {
+		return JSONUsage{}, err
+	}
 	body := map[string]any{"model": model, "temperature": 0.2, "messages": []map[string]string{{"role": "system", "content": system}, {"role": "user", "content": user}}}
 	encoded, err := json.Marshal(body)
 	if err != nil {
-		return err
+		return JSONUsage{}, err
 	}
+	var lastErr error
+	for attempt := 1; attempt <= maxProviderJSONAttempts; attempt++ {
+		usage, requestErr := p.generateJSONOnce(ctx, encoded, output)
+		if requestErr == nil {
+			usage.Model = model
+			return usage, nil
+		}
+		lastErr = requestErr
+		if attempt == maxProviderJSONAttempts || !connectors.IsRetryable(requestErr) {
+			break
+		}
+		if waitErr := waitForProviderRetry(ctx, attempt); waitErr != nil {
+			return JSONUsage{}, waitErr
+		}
+	}
+	return JSONUsage{}, lastErr
+}
+
+func (p *DeepSeekProvider) generateJSONOnce(ctx context.Context, encoded []byte, output any) (JSONUsage, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.BaseURL+"/chat/completions", bytes.NewReader(encoded))
 	if err != nil {
-		return err
+		return JSONUsage{}, err
 	}
 	req.Header.Set("Authorization", "Bearer "+p.apiKey())
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := p.Client.Do(req)
+	client := p.Client
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
-		return err
+		return JSONUsage{}, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		payload, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("deepseek returned %s: %s", resp.Status, strings.TrimSpace(string(payload)))
+		return JSONUsage{}, providerHTTPError("deepseek generation", resp)
 	}
 	var envelope struct {
 		Choices []struct {
@@ -641,18 +842,40 @@ func (p *DeepSeekProvider) chatJSON(ctx context.Context, model, system, user str
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
+		Usage struct {
+			PromptTokens     int `json:"prompt_tokens"`
+			CompletionTokens int `json:"completion_tokens"`
+			TotalTokens      int `json:"total_tokens"`
+		} `json:"usage"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		return err
+		return JSONUsage{}, err
 	}
 	if len(envelope.Choices) == 0 || strings.TrimSpace(envelope.Choices[0].Message.Content) == "" {
-		return errors.New("deepseek returned empty content")
+		return JSONUsage{}, errors.New("deepseek returned empty content")
 	}
 	content := strings.TrimSpace(envelope.Choices[0].Message.Content)
 	content = strings.TrimPrefix(content, "```json")
 	content = strings.TrimPrefix(content, "```")
 	content = strings.TrimSuffix(content, "```")
-	return json.Unmarshal([]byte(strings.TrimSpace(content)), output)
+	if err := json.Unmarshal([]byte(strings.TrimSpace(content)), output); err != nil {
+		return JSONUsage{}, err
+	}
+	usage := JSONUsage{InputTokens: envelope.Usage.PromptTokens, OutputTokens: envelope.Usage.CompletionTokens, TotalTokens: envelope.Usage.TotalTokens}
+	usage.Available = usage.InputTokens > 0 || usage.OutputTokens > 0 || usage.TotalTokens > 0
+	return usage, nil
+}
+
+func waitForProviderRetry(ctx context.Context, attempt int) error {
+	delay := providerRetryBaseDelay * time.Duration(1<<(attempt-1))
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 type FallbackProvider struct {
@@ -734,4 +957,88 @@ func (p FallbackProvider) GenerateCopilot(ctx context.Context, request CopilotRe
 		return domain.CopilotResult{}, ErrProviderUnavailable
 	}
 	return p.Fallback.GenerateCopilot(ctx, request)
+}
+
+func (p FallbackProvider) GenerateMissionWithUsage(ctx context.Context, request MissionRequest) (domain.Mission, JSONUsage, error) {
+	if p.Primary != nil && p.Primary.Configured() {
+		if provider, ok := p.Primary.(UsageAwareMissionProvider); ok {
+			if result, usage, err := provider.GenerateMissionWithUsage(ctx, request); err == nil {
+				return result, usage, nil
+			} else if !p.fallbackEnabled() {
+				return domain.Mission{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+			}
+		} else if result, err := p.Primary.GenerateMission(ctx, request); err == nil {
+			return result, JSONUsage{}, nil
+		} else if !p.fallbackEnabled() {
+			return domain.Mission{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+		}
+	}
+	if !p.fallbackEnabled() {
+		return domain.Mission{}, JSONUsage{}, ErrProviderUnavailable
+	}
+	result, err := p.Fallback.GenerateMission(ctx, request)
+	return result, JSONUsage{}, err
+}
+
+func (p FallbackProvider) EvaluateWritingWithUsage(ctx context.Context, request WritingRequest) (domain.Evaluation, JSONUsage, error) {
+	if p.Primary != nil && p.Primary.Configured() {
+		if provider, ok := p.Primary.(UsageAwareWritingProvider); ok {
+			if result, usage, err := provider.EvaluateWritingWithUsage(ctx, request); err == nil {
+				return result, usage, nil
+			} else if !p.fallbackEnabled() {
+				return domain.Evaluation{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+			}
+		} else if result, err := p.Primary.EvaluateWriting(ctx, request); err == nil {
+			return result, JSONUsage{}, nil
+		} else if !p.fallbackEnabled() {
+			return domain.Evaluation{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+		}
+	}
+	if !p.fallbackEnabled() {
+		return domain.Evaluation{}, JSONUsage{}, ErrProviderUnavailable
+	}
+	result, err := p.Fallback.EvaluateWriting(ctx, request)
+	return result, JSONUsage{}, err
+}
+
+func (p FallbackProvider) GenerateRoleplayWithUsage(ctx context.Context, request RoleplayRequest) (RoleplayResult, JSONUsage, error) {
+	if provider, ok := p.Primary.(UsageAwareRoleplayProvider); ok && p.Primary.Configured() {
+		if result, usage, err := provider.GenerateRoleplayWithUsage(ctx, request); err == nil {
+			return result, usage, nil
+		} else if !p.fallbackEnabled() {
+			return RoleplayResult{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+		}
+	} else if provider, ok := p.Primary.(RoleplayProvider); ok && p.Primary != nil && p.Primary.Configured() {
+		if result, err := provider.GenerateRoleplay(ctx, request); err == nil {
+			return result, JSONUsage{}, nil
+		} else if !p.fallbackEnabled() {
+			return RoleplayResult{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+		}
+	}
+	if !p.fallbackEnabled() {
+		return RoleplayResult{}, JSONUsage{}, ErrProviderUnavailable
+	}
+	result, err := p.Fallback.GenerateRoleplay(ctx, request)
+	return result, JSONUsage{}, err
+}
+
+func (p FallbackProvider) GenerateCopilotWithUsage(ctx context.Context, request CopilotRequest) (domain.CopilotResult, JSONUsage, error) {
+	if provider, ok := p.Primary.(UsageAwareCopilotProvider); ok && p.Primary.Configured() {
+		if result, usage, err := provider.GenerateCopilotWithUsage(ctx, request); err == nil {
+			return result, usage, nil
+		} else if !p.fallbackEnabled() {
+			return domain.CopilotResult{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+		}
+	} else if provider, ok := p.Primary.(CopilotProvider); ok && p.Primary != nil && p.Primary.Configured() {
+		if result, err := provider.GenerateCopilot(ctx, request); err == nil {
+			return result, JSONUsage{}, nil
+		} else if !p.fallbackEnabled() {
+			return domain.CopilotResult{}, JSONUsage{}, fmt.Errorf("%w: primary provider request failed", ErrProviderUnavailable)
+		}
+	}
+	if !p.fallbackEnabled() {
+		return domain.CopilotResult{}, JSONUsage{}, ErrProviderUnavailable
+	}
+	result, err := p.Fallback.GenerateCopilot(ctx, request)
+	return result, JSONUsage{}, err
 }

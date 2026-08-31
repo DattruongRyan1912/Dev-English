@@ -1,0 +1,69 @@
+name: PostgreSQL integrations
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  postgres-integrations:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: infra/docker-compose.ci.yml
+      COMPOSE_PROJECT_NAME: devenglish-postgres-integrations-${{ github.run_id }}
+      POSTGRES_SERVICE: postgres
+      POSTGRES_USER: devenglish
+      POSTGRES_DB: devenglish
+      DEVENGLISH_TEST_DATABASE_URL: postgres://devenglish:devenglish-ci@127.0.0.1:5432/devenglish?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Test coverage gate
+        run: node --test scripts/backend_coverage_gate_test.mjs
+      - name: Start disposable PostgreSQL
+        run: docker compose up -d postgres
+      - name: Wait for PostgreSQL
+        run: |
+          for attempt in $(seq 1 60); do
+            if docker compose exec -T "$POSTGRES_SERVICE" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose logs "$POSTGRES_SERVICE"
+          exit 1
+      - name: Apply migrations and verify rollback behavior
+        run: ./scripts/db_migrate_test.sh
+      - name: Run connector PostgreSQL integration tests
+        run: go test ./backend/internal/connectors -run '^TestPostgres(RevisionStoresPersistImmutableRevisionsAndCursors|SafeWriteReceiptStoreScopesWorkspaces)$' -count=1
+      - name: Run MCP PostgreSQL integration tests
+        run: go test ./backend/internal/mcp -run '^TestPostgresTokenPersistenceSurvivesRestartAndSharesRevocation$' -count=1
+      - name: Run application PostgreSQL idempotency integration test
+        run: go test ./backend/internal/application -run '^TestPostgresApplicationManualImportIsIdempotent$' -count=1
+      - name: Run full backend race gate with PostgreSQL enabled
+        run: go test -mod=readonly -count=1 -race ./...
+      - name: Run backend package coverage gate
+        run: |
+          mkdir -p coverage
+          go test -coverprofile=coverage/backend.out ./... -count=1
+          node scripts/backend_coverage_gate.mjs --profile coverage/backend.out \
+            --min 90 \
+            --baseline-manifest docs/project/coverage/2026-08-29-r0-backend-coverage-baseline.json
+      - name: Upload backend coverage profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-${{ github.run_id }}
+          path: coverage/backend.out
+          if-no-files-found: ignore
+      - name: Stop disposable PostgreSQL
+        if: always()
+        run: docker compose down -v

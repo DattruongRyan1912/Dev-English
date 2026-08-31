@@ -13,11 +13,18 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/actions"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/ai"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/application"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/auth"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/connectors"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/httpapi"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/integrations"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/knowledge"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/learning"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/learningoverlay"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/mcp"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/platform"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/secrets"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/store"
 )
@@ -25,6 +32,11 @@ import (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	environment := runtimeEnvironment()
+	moduleManifest, manifestErr := platform.ParseManifest(os.Getenv("DEVENGLISH_MODULES"))
+	if manifestErr != nil {
+		logger.Error("invalid module manifest", "error", manifestErr)
+		os.Exit(1)
+	}
 	production := environment == "production"
 	authManager := auth.NewFromEnv()
 	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
@@ -94,7 +106,133 @@ func main() {
 			logger.Warn("could not update provider settings", "error", err)
 		}
 	}
+	var productApp *application.App
+	var appErr error
+	if postgres != nil {
+		productApp, appErr = application.NewPostgres(postgres.Pool)
+	} else {
+		productApp, appErr = application.NewMemory()
+	}
+	if appErr != nil {
+		logger.Error("product application initialization failed", "error", appErr)
+		os.Exit(1)
+	}
+	// Development/test use a seeded user so the local shell can start without a
+	// login round-trip. Production must not invent an owner before the first
+	// authenticated login; authLogin ensures the user and workspace lazily.
+	if !production {
+		if appErr := productApp.EnsureDefaultScope(store.WithUser(context.Background(), "user-1")); appErr != nil {
+			logger.Error("product workspace initialization failed", "error", appErr)
+			os.Exit(1)
+		}
+	}
+	assistantGenerator := application.NewDeepSeekAssistantGenerator(deepseek, repository, environment == "development" || environment == "test")
+	assistantGenerator.StrictUsage = production
+	if err := productApp.SetAssistantGenerator(assistantGenerator); err != nil {
+		logger.Error("assistant generator initialization failed", "error", err)
+		os.Exit(1)
+	}
+	var embedder knowledge.EmbeddingProvider
+	if configuredEmbedder := knowledge.NewHTTPEmbeddingProviderFromEnv(); configuredEmbedder != nil {
+		embedder = configuredEmbedder
+		productApp.SetKnowledgeEmbedder(configuredEmbedder)
+	}
+	var learningOverlayRepository learningoverlay.Repository
+	if postgres != nil {
+		repository, err := learningoverlay.NewPostgresRepository(postgres.Pool)
+		if err != nil {
+			logger.Error("learning overlay initialization failed", "error", err)
+			os.Exit(1)
+		}
+		learningOverlayRepository = repository
+	} else {
+		learningOverlayRepository = learningoverlay.NewMemoryRepository()
+	}
+	learningOverlayService, err := learningoverlay.NewService(learningOverlayRepository)
+	if err != nil {
+		logger.Error("learning overlay service initialization failed", "error", err)
+		os.Exit(1)
+	}
+	var challengeIssuer connectors.SafeWriteChallengeIssuer
+	var challengeReader connectors.SafeWriteChallengeReader
+	var challengeStore connectors.SafeWriteChallengeStore
+	var receiptStore connectors.SafeWriteReceiptStore
+	if postgres != nil {
+		postgresChallenges, err := connectors.NewPostgresSafeWriteChallengeStore(postgres.Pool)
+		if err != nil {
+			logger.Error("safe-write challenge store initialization failed", "error", err)
+			os.Exit(1)
+		}
+		postgresReceipts, err := connectors.NewPostgresSafeWriteReceiptStore(postgres.Pool)
+		if err != nil {
+			logger.Error("safe-write receipt store initialization failed", "error", err)
+			os.Exit(1)
+		}
+		challengeIssuer, challengeReader, challengeStore, receiptStore = postgresChallenges, postgresChallenges, postgresChallenges, postgresReceipts
+	} else {
+		memoryChallenges := connectors.NewMemorySafeWriteChallengeStore()
+		challengeIssuer, challengeReader, challengeStore = memoryChallenges, memoryChallenges, memoryChallenges
+		receiptStore = connectors.NewMemorySafeWriteReceiptStore()
+	}
+	guardedGitHub, err := connectors.NewGitHubSafeWriteService(github, challengeStore, receiptStore)
+	if err != nil {
+		logger.Error("safe-write service initialization failed", "error", err)
+		os.Exit(1)
+	}
+	actionService, err := actions.NewServiceWithWork(guardedGitHub, productApp.Work, challengeIssuer, challengeReader)
+	if err != nil {
+		logger.Error("action service initialization failed", "error", err)
+		os.Exit(1)
+	}
+	var tokenPersistence mcp.TokenPersistence
+	if postgres != nil {
+		tokenPersistence, err = mcp.NewPostgresTokenPersistence(postgres.Pool)
+		if err != nil {
+			logger.Error("MCP token persistence initialization failed", "error", err)
+			os.Exit(1)
+		}
+	}
+	mcpTokenStore := mcp.NewTokenStore(mcp.WithTokenPersistence(tokenPersistence))
+	mcpApplication, err := mcp.NewApplication(mcp.ApplicationServices{
+		Assistant: productApp.Assistant,
+		Knowledge: productApp.Knowledge,
+		Work:      productApp.Work,
+		Product:   productApp,
+		Actions:   actionService,
+	})
+	if err != nil {
+		logger.Error("MCP application initialization failed", "error", err)
+		os.Exit(1)
+	}
+	mcpRegistry := mcp.NewRegistry()
+	if err := mcpApplication.Register(mcpRegistry); err != nil {
+		logger.Error("MCP registry initialization failed", "error", err)
+		os.Exit(1)
+	}
 	api := httpapi.NewServer(service, logger, authManager)
+	api.Modules = moduleManifest
+	api.Application = productApp
+	api.Actions = actionService
+	api.LearningOverlay = learningOverlayService
+	api.MCPTokenStore = mcpTokenStore
+	api.MCP = mcp.NewHandler(mcpRegistry, mcpTokenStore)
+	if postgres != nil {
+		driveReader := integrations.NewGoogleDriveFromEnv()
+		api.DriveSync = func(workspaceID string) (*connectors.DriveSyncService, error) {
+			sink, err := connectors.NewPostgresDriveRevisionStoreWithEmbedder(postgres.Pool, workspaceID, embedder)
+			if err != nil {
+				return nil, err
+			}
+			return connectors.NewDriveSyncService(driveReader, sink)
+		}
+		api.GitHubSync = func(workspaceID string) (*connectors.GitHubImportService, error) {
+			sink, err := connectors.NewPostgresGitHubRevisionStoreWithEmbedder(postgres.Pool, workspaceID, embedder)
+			if err != nil {
+				return nil, err
+			}
+			return connectors.NewGitHubImportService(github, sink)
+		}
+	}
 	api.StrictAuth = production
 	api.AllowedOrigins = allowedOrigins
 	api.LoginSecret = loginSecret

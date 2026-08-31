@@ -41,7 +41,36 @@ class _DiagnosticScreenState extends State<DiagnosticScreen> {
             return _ResultView(result: result);
           }
           if (questions.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            final loading = widget.controller.diagnosticLoading;
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (loading) ...[
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: AppSpacing.lg),
+                    const Text('Loading diagnostic...'),
+                  ] else ...[
+                    const Text(
+                      'Diagnostic is temporarily unavailable.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      widget.controller.diagnosticError ??
+                          'The backend did not return any questions.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    FilledButton.icon(
+                      onPressed: widget.controller.loadDiagnostic,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry diagnostic'),
+                    ),
+                  ],
+                ],
+              ),
+            );
           }
           final question = questions[_index.clamp(0, questions.length - 1)];
           return ListView(

@@ -5,9 +5,10 @@ import '../models.dart';
 import '../theme.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.controller});
+  const SettingsScreen({super.key, required this.controller, this.onSignedOut});
 
   final AppController controller;
+  final VoidCallback? onSignedOut;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -39,6 +40,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _signOut() async {
     await widget.controller.logout();
+    widget.onSignedOut?.call();
     if (!mounted) return;
     Navigator.of(context).pop();
   }
@@ -293,8 +295,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   contentPadding: const EdgeInsets.all(AppSpacing.lg),
                   leading: const Icon(Icons.payments_outlined),
                   title: const Text('AI usage'),
-                  subtitle: Text(
-                    '${widget.controller.usageSummary!.estimatedCost.toStringAsFixed(0)} VND estimated this month · ${widget.controller.usageSummary!.budgetUsedPercent.toStringAsFixed(1)}% of budget',
+                  subtitle: Builder(
+                    builder: (context) {
+                      final usage = widget.controller.usageSummary!;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${usage.estimatedCost.toStringAsFixed(0)} VND estimated this month · ${usage.budgetUsedPercent.toStringAsFixed(1)}% of budget',
+                          ),
+                          if (usage.unavailableRecords > 0) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              '${usage.unavailableRecords} request(s) have no provider usage data; they are excluded from this cost total.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        ],
+                      );
+                    },
                   ),
                 ),
               ),

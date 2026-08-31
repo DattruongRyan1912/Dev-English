@@ -1,0 +1,11 @@
+FROM alpine:3.22
+
+RUN apk add --no-cache ca-certificates wget \
+    && addgroup -S devenglish \
+    && adduser -S -G devenglish devenglish
+WORKDIR /app
+COPY devenglish-server ./devenglish-server
+RUN chmod 0755 /app/devenglish-server
+USER devenglish
+EXPOSE 8080
+ENTRYPOINT ["/app/devenglish-server"]

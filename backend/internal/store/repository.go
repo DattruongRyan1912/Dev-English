@@ -69,6 +69,39 @@ type Repository interface {
 	DeleteUserData(context.Context) error
 }
 
+// UsageMetric identifies the unit protected by an AI budget reservation.
+// Reservation amounts are preflight estimates used only to prevent concurrent
+// requests from crossing a configured cap. They are not usage records; final
+// usage records must contain provider-reported values or be marked unavailable.
+type UsageMetric string
+
+const (
+	UsageMetricTokens UsageMetric = "tokens"
+	UsageMetricCost   UsageMetric = "cost"
+)
+
+// UsageReservationRequest is deliberately separate from Repository. Older
+// storage adapters can continue to work with read/write usage accounting while
+// the Postgres and memory stores opt into atomic reservations.
+type UsageReservationRequest struct {
+	ID         string
+	UserID     string
+	MonthStart time.Time
+	Feature    string
+	Metric     UsageMetric
+	Amount     float64
+	Limit      float64
+	ExpiresAt  time.Time
+}
+
+// UsageReservationStore provides a durable, concurrency-safe budget boundary.
+// CompleteUsageReservation marks the reservation committed after usage is
+// recorded, or released after a failed provider call.
+type UsageReservationStore interface {
+	ReserveUsage(context.Context, UsageReservationRequest) (bool, error)
+	CompleteUsageReservation(context.Context, string, bool) error
+}
+
 // WritingOutcome is the durable unit produced by one writing submission.
 // Implementations should persist the complete learning transition atomically.
 type WritingOutcome struct {

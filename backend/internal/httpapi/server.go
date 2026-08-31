@@ -13,22 +13,41 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/actions"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/ai"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/application"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/auth"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/connectors"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/domain"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/learning"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/learningoverlay"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/mcp"
+	"github.com/DattruongRyan1912/Dev-English/backend/internal/platform"
 	"github.com/DattruongRyan1912/Dev-English/backend/internal/store"
 )
 
+type DriveSyncFactory func(workspaceID string) (*connectors.DriveSyncService, error)
+type GitHubSyncFactory func(workspaceID string) (*connectors.GitHubImportService, error)
+
 type Server struct {
-	Service        *learning.Service
-	Logger         *slog.Logger
-	Auth           *auth.Manager
-	StrictAuth     bool
-	AllowedOrigins []string
-	LoginSecret    string
-	sessionMu      sync.Mutex
-	sessions       map[[sha256.Size]byte]time.Time
+	Service         *learning.Service
+	Application     *application.App
+	Actions         *actions.Service
+	LearningOverlay *learningoverlay.Service
+	MCP             *mcp.Handler
+	MCPTokenStore   *mcp.TokenStore
+	DriveSync       DriveSyncFactory
+	GitHubSync      GitHubSyncFactory
+	Logger          *slog.Logger
+	Auth            *auth.Manager
+	StrictAuth      bool
+	AllowedOrigins  []string
+	LoginSecret     string
+	// Modules selects compiled-in V2/MCP surfaces. A zero manifest means all
+	// modules for backwards-compatible test/embedding construction.
+	Modules   platform.Manifest
+	sessionMu sync.Mutex
+	sessions  map[[sha256.Size]byte]time.Time
 }
 
 const webSessionCookieName = "devenglish_session"
@@ -91,12 +110,24 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/v1/missions/daily", s.createDailyMission)
 	mux.HandleFunc("POST /api/v1/work-context", s.workContext)
 	mux.HandleFunc("POST /api/v1/missions/", s.missionAction)
+	s.registerV2(mux)
+	if s.MCP != nil && s.moduleEnabled(platform.ModuleMCP) {
+		mux.Handle("/mcp", s.MCP)
+	}
 	return withCORS(withRequestLog(s.withAuth(mux), s.Logger), s.AllowedOrigins, s.StrictAuth)
+}
+
+func (s *Server) moduleEnabled(id string) bool {
+	if s == nil {
+		return false
+	}
+	return s.Modules.Enabled(id)
 }
 
 func (s *Server) withAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/healthz" || r.URL.Path == "/readyz" ||
+			r.URL.Path == "/mcp" ||
 			(r.URL.Path == "/api/v1/auth/session" && r.Method == http.MethodPost) ||
 			(r.URL.Path == "/api/v1/auth/login" && r.Method == http.MethodPost) ||
 			(r.URL.Path == "/api/v1/auth/logout" && r.Method == http.MethodPost) {
@@ -324,10 +355,13 @@ func (s *Server) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 func providerMode(provider ai.Provider) string {
-	if provider == nil || !provider.Configured() {
-		if provider != nil && provider.Name() == "deterministic-fallback" {
-			return "deterministic-fallback"
-		}
+	if provider == nil {
+		return "unavailable"
+	}
+	if provider.Name() == "deterministic-fallback" {
+		return "deterministic-fallback"
+	}
+	if !provider.Configured() {
 		return "unavailable"
 	}
 	return "primary"
@@ -460,6 +494,10 @@ func (s *Server) roleplayTurn(w http.ResponseWriter, r *http.Request) {
 func (s *Server) copilot(w http.ResponseWriter, r *http.Request) {
 	var input domain.CopilotRequest
 	if err := decodeJSON(w, r, &input); err != nil {
+		return
+	}
+	if strings.TrimSpace(input.Vietnamese) == "" {
+		writeError(w, http.StatusBadRequest, errors.New("vietnamese text is required"))
 		return
 	}
 	result, err := s.Service.Copilot(r.Context(), input)
@@ -837,7 +875,7 @@ func withCORS(next http.Handler, allowedOrigins []string, strictAuth bool) http.
 			}
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
-		allowedHeaders := "Content-Type"
+		allowedHeaders := "Content-Type, Idempotency-Key"
 		if !strictAuth {
 			allowedHeaders += ", Authorization, X-Bootstrap-Key"
 		}
@@ -876,6 +914,14 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, target any) error {
 		writeError(w, http.StatusBadRequest, errors.New("request body must be valid JSON"))
 		return err
 	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		writeError(w, http.StatusBadRequest, errors.New("request body must contain one JSON value"))
+		if err == nil {
+			return errors.New("request body contains multiple JSON values")
+		}
+		return err
+	}
 	return nil
 }
 
@@ -886,7 +932,11 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 
 func writeError(w http.ResponseWriter, status int, err error) {
-	writeJSON(w, status, map[string]any{"error": map[string]string{"message": err.Error()}})
+	message := "request failed"
+	if err != nil {
+		message = connectors.RedactSecrets(err.Error())
+	}
+	writeJSON(w, status, map[string]any{"error": map[string]string{"message": message}})
 }
 
 func WithTimeout(parent context.Context) (context.Context, context.CancelFunc) {

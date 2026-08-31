@@ -14,6 +14,46 @@ func currentScope() Scope {
 	return Scope{WorkspaceID: "workspace-1", UserID: "user-1"}
 }
 
+func TestContextRefNormalizeValidatesAndCanonicalizes(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   ContextRef
+		want    ContextRef
+		wantErr error
+	}{
+		{name: "empty", input: ContextRef{}, want: ContextRef{}},
+		{
+			name:  "canonicalizes type and id whitespace",
+			input: ContextRef{Type: " TASK ", ID: " task-1 "},
+			want:  ContextRef{Type: ContextTask, ID: "task-1"},
+		},
+		{name: "partial type", input: ContextRef{Type: ContextProject}, wantErr: ErrInvalidInput},
+		{name: "partial id", input: ContextRef{ID: "project-1"}, wantErr: ErrInvalidInput},
+		{name: "unsupported type", input: ContextRef{Type: "conversation", ID: "conversation-1"}, wantErr: ErrInvalidInput},
+		{name: "control character id", input: ContextRef{Type: ContextSource, ID: "source\n1"}, wantErr: ErrInvalidInput},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.input.Normalize()
+			if test.wantErr != nil {
+				if !errors.Is(err, test.wantErr) {
+					t.Fatalf("Normalize() error = %v, want %v", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Normalize() error = %v", err)
+			}
+			if got != test.want {
+				t.Fatalf("Normalize() = %+v, want %+v", got, test.want)
+			}
+			if err := got.Validate(); err != nil {
+				t.Fatalf("Validate() error = %v", err)
+			}
+		})
+	}
+}
+
 func currentEvidence() []Evidence {
 	return []Evidence{{
 		Scope:      currentScope(),
@@ -391,6 +431,30 @@ func TestServiceBindsWorkspaceBeforeGenerationAndGroundsOutput(t *testing.T) {
 	}
 }
 
+func TestServicePropagatesNormalizedCanonicalContext(t *testing.T) {
+	retriever := &fakeRetriever{items: currentEvidence()}
+	generator := &fakeGenerator{draft: Draft{
+		Answer:    "The task is verified; the system uses PostgreSQL.",
+		Citations: []Citation{{EvidenceID: "evidence-1", Quote: "uses PostgreSQL"}},
+	}}
+	service, err := NewService(retriever, generator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := ContextRef{Type: ContextTask, ID: "task-1"}
+	response, err := service.Ask(context.Background(), AskRequest{
+		Scope:   currentScope(),
+		Message: "What is the task status?",
+		Context: ContextRef{Type: " TASK ", ID: "task-1"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Grounding != Grounded || retriever.request.Context != want || generator.request.Context != want {
+		t.Fatalf("canonical context was not normalized and propagated: response=%+v retrieval=%+v generation=%+v", response, retriever.request.Context, generator.request.Context)
+	}
+}
+
 func TestServiceDoesNotGenerateWithoutEvidence(t *testing.T) {
 	retriever := &fakeRetriever{}
 	generator := &fakeGenerator{draft: Draft{
@@ -511,5 +575,163 @@ func TestNewServiceRequiresBothDependencies(t *testing.T) {
 	}
 	if _, err := NewService(&fakeRetriever{}, nil); !errors.Is(err, ErrNilGenerator) {
 		t.Fatalf("expected nil generator error, got %v", err)
+	}
+}
+
+func TestServiceRejectsNilReceiverAndContext(t *testing.T) {
+	var service *Service
+	if _, err := service.Ask(context.Background(), AskRequest{Scope: currentScope(), Message: "question"}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("nil service should be rejected, got %v", err)
+	}
+
+	service, err := NewService(&fakeRetriever{}, &fakeGenerator{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Ask(nil, AskRequest{Scope: currentScope(), Message: "question"}); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("nil context should be rejected, got %v", err)
+	}
+}
+
+func TestServiceCopiesHistoryAndNormalizesRequestIdentifiers(t *testing.T) {
+	retriever := &fakeRetriever{items: currentEvidence()}
+	generator := &fakeGenerator{draft: Draft{
+		Answer:    "The API uses PostgreSQL.",
+		Citations: []Citation{{EvidenceID: "evidence-1", Quote: "uses PostgreSQL"}},
+	}}
+	service, err := NewService(retriever, generator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	history := []ConversationTurn{{Role: "user", Content: "Earlier question"}}
+	_, err = service.Ask(context.Background(), AskRequest{
+		Scope:          currentScope(),
+		ConversationID: " conversation-1 ",
+		Message:        " question ",
+		History:        history,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retriever.request.ConversationID != "conversation-1" || retriever.request.Query != "question" {
+		t.Fatalf("retrieval request was not normalized: %+v", retriever.request)
+	}
+	if generator.request.ConversationID != "conversation-1" || generator.request.Message != "question" {
+		t.Fatalf("generation request was not normalized: %+v", generator.request)
+	}
+	if !reflect.DeepEqual(generator.request.History, history) {
+		t.Fatalf("history was not propagated: got=%+v want=%+v", generator.request.History, history)
+	}
+	generator.request.History[0].Content = "mutated copy"
+	if history[0].Content != "Earlier question" {
+		t.Fatal("service must copy non-empty history before passing it to the generator")
+	}
+}
+
+func TestNewActionReceiptAttachmentValidatesCanonicalIdentity(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*ActionBinding, *ActionReceipt)
+		want   error
+	}{
+		{name: "missing binding workspace", mutate: func(binding *ActionBinding, _ *ActionReceipt) { binding.Scope.WorkspaceID = "" }, want: ErrInvalidInput},
+		{name: "missing receipt scope", mutate: func(_ *ActionBinding, receipt *ActionReceipt) { receipt.Scope = Scope{} }, want: ErrInvalidReceipt},
+		{name: "binding receipt mismatch", mutate: func(binding *ActionBinding, _ *ActionReceipt) { binding.Operation = "github.issue.comment" }, want: ErrReceiptBindingMismatch},
+		{name: "invalid status", mutate: func(_ *ActionBinding, receipt *ActionReceipt) { receipt.Status = "completed" }, want: ErrInvalidReceipt},
+		{name: "replayed pending", mutate: func(_ *ActionBinding, receipt *ActionReceipt) {
+			receipt.Status = ReceiptPending
+			receipt.Replayed = true
+		}, want: ErrInvalidReceipt},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			binding, receipt := currentBinding(), currentReceipt()
+			test.mutate(&binding, &receipt)
+			if _, err := NewActionReceiptAttachment(binding, receipt); !errors.Is(err, test.want) {
+				t.Fatalf("constructor error = %v, want %v", err, test.want)
+			}
+		})
+	}
+}
+
+func TestNormalizeResponseValidatesActionAndEvidenceBoundaries(t *testing.T) {
+	validDraft := func(actions []SuggestedAction) Draft {
+		return Draft{
+			Answer:           "The API uses PostgreSQL.",
+			Citations:        []Citation{{EvidenceID: "evidence-1", Quote: "uses PostgreSQL"}},
+			SuggestedActions: actions,
+		}
+	}
+	for _, test := range []struct {
+		name    string
+		actions []SuggestedAction
+	}{
+		{name: "missing action id", actions: []SuggestedAction{{Kind: "work.task.create", Label: "Create task"}}},
+		{name: "duplicate action id", actions: []SuggestedAction{{ID: "action-1", Kind: "work.task.create", Label: "Create one"}, {ID: "action-1", Kind: "work.task.create", Label: "Create two"}}},
+		{name: "missing action label", actions: []SuggestedAction{{ID: "action-1", Kind: "work.task.create"}}},
+		{name: "unbounded target", actions: []SuggestedAction{{ID: "action-1", Kind: "work.task.create", Label: "Create task", Target: strings.Repeat("x", maxTextLength+1)}}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := NormalizeResponse(currentScope(), validDraft(test.actions), currentEvidence()); !errors.Is(err, ErrInvalidAction) {
+				t.Fatalf("action validation error = %v, want %v", err, ErrInvalidAction)
+			}
+		})
+	}
+
+	invalidEvidence := currentEvidence()
+	invalidEvidence[0].SourceID = "source\x00id"
+	if _, err := NormalizeResponse(currentScope(), validDraft(nil), invalidEvidence); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("invalid source identifier should be rejected, got %v", err)
+	}
+	invalidEvidence = currentEvidence()
+	invalidEvidence[0].Scope.UserID = ""
+	if _, err := NormalizeResponse(currentScope(), validDraft(nil), invalidEvidence); !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("incomplete evidence scope should be rejected, got %v", err)
+	}
+}
+
+func TestNormalizeResponseUsesEvidenceIDWhenStaleSourceIsMissing(t *testing.T) {
+	evidence := currentEvidence()
+	evidence[0].SourceID = ""
+	evidence[0].Freshness = FreshUnknown
+	response, err := NormalizeResponse(currentScope(), Draft{
+		Answer:    "The API uses PostgreSQL.",
+		Citations: []Citation{{EvidenceID: "evidence-1", Quote: "uses PostgreSQL"}},
+	}, evidence)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Grounding != Inferred || !reflect.DeepEqual(response.StaleSources, []string{"evidence-1"}) {
+		t.Fatalf("stale evidence fallback key was not exposed: %+v", response)
+	}
+}
+
+func TestValidationHelpersRemainBoundedAndControlSafe(t *testing.T) {
+	for _, value := range []string{"", " leading", "trailing ", strings.Repeat("x", maxIdentifierLength+1), "bad\x00id"} {
+		if err := validateIdentifier("id", value); err == nil {
+			t.Fatalf("identifier %q should be rejected", value)
+		}
+	}
+	if err := validateIdentifier("id", "stable-id"); err != nil {
+		t.Fatalf("valid identifier was rejected: %v", err)
+	}
+	if hasDisallowedControl("line\nwith\ttabs", true) || !hasDisallowedControl("line\x00", true) {
+		t.Fatal("text-control policy is incorrect")
+	}
+	if got := appendUnique([]string{"one"}, "one"); !reflect.DeepEqual(got, []string{"one"}) {
+		t.Fatalf("appendUnique duplicated an existing value: %+v", got)
+	}
+}
+
+func TestValidationErrorFormatsNilAndEmptyFields(t *testing.T) {
+	var nilError *ValidationError
+	if nilError.Error() != ErrInvalidInput.Error() {
+		t.Fatalf("nil validation error = %q", nilError.Error())
+	}
+	if got := (&ValidationError{Reason: "bad value"}).Error(); got != "assistant input is invalid: bad value" {
+		t.Fatalf("empty-field validation error = %q", got)
+	}
+	if !errors.Is(&ValidationError{Field: "message", Reason: "bad"}, ErrInvalidInput) {
+		t.Fatal("validation errors must unwrap to ErrInvalidInput")
 	}
 }

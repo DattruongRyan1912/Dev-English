@@ -48,7 +48,9 @@ func (f *FakeDriveReader) RequestsSnapshot() []DriveListRequest {
 type MemoryDriveRevisionStore struct {
 	mu               sync.Mutex
 	Revisions        map[string]DriveSourceItem
+	RemovedFiles     map[string]time.Time
 	Cursors          map[string]DriveSyncState
+	SyncRuns         map[string]MemorySyncRun
 	HasRevisionError error
 	PutRevisionError error
 	SaveCursorError  error
@@ -56,17 +58,67 @@ type MemoryDriveRevisionStore struct {
 
 func NewMemoryDriveRevisionStore() *MemoryDriveRevisionStore {
 	return &MemoryDriveRevisionStore{
-		Revisions: make(map[string]DriveSourceItem),
-		Cursors:   make(map[string]DriveSyncState),
+		Revisions:    make(map[string]DriveSourceItem),
+		RemovedFiles: make(map[string]time.Time),
+		Cursors:      make(map[string]DriveSyncState),
+		SyncRuns:     make(map[string]MemorySyncRun),
 	}
 }
 
-func (s *MemoryDriveRevisionStore) HasRevision(ctx context.Context, workspaceID, revisionKey string) (bool, error) {
+type MemorySyncRun struct {
+	ID           string
+	Provider     string
+	WorkspaceID  string
+	Target       string
+	CursorBefore string
+	CursorAfter  string
+	Status       string
+	Summary      SyncRunSummary
+	ErrorCode    string
+	StartedAt    time.Time
+	CompletedAt  time.Time
+}
+
+func (s *MemoryDriveRevisionStore) StartSyncRun(ctx context.Context, provider, workspaceID, target, cursorBefore string, startedAt time.Time) (string, error) {
 	if err := contextError(ctx); err != nil {
-		return false, err
+		return "", err
 	}
-	key, err := scopedRevisionKey(workspaceID, revisionKey)
-	if err != nil {
+	if strings.TrimSpace(workspaceID) == "" {
+		return "", ErrInvalidWorkspaceID
+	}
+	if startedAt.IsZero() {
+		startedAt = time.Now().UTC()
+	}
+	id := newSyncRunID(provider, workspaceID, target, startedAt)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.SyncRuns == nil {
+		s.SyncRuns = make(map[string]MemorySyncRun)
+	}
+	s.SyncRuns[id] = MemorySyncRun{ID: id, Provider: provider, WorkspaceID: workspaceID, Target: target, CursorBefore: cursorBefore, Status: "running", StartedAt: startedAt}
+	return id, nil
+}
+
+func (s *MemoryDriveRevisionStore) CompleteSyncRun(ctx context.Context, runID, status string, summary SyncRunSummary, cursorAfter, errorCode string, completedAt time.Time) error {
+	if err := contextError(ctx); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	run, ok := s.SyncRuns[runID]
+	if !ok {
+		return ErrNotFound
+	}
+	if run.Status != "running" {
+		return ErrNotFound
+	}
+	run.Status, run.Summary, run.CursorAfter, run.ErrorCode, run.CompletedAt = status, summary, cursorAfter, errorCode, completedAt
+	s.SyncRuns[runID] = run
+	return nil
+}
+
+func (s *MemoryDriveRevisionStore) HasRevision(ctx context.Context, revisionKey string) (bool, error) {
+	if err := contextError(ctx); err != nil {
 		return false, err
 	}
 	s.mu.Lock()
@@ -74,19 +126,15 @@ func (s *MemoryDriveRevisionStore) HasRevision(ctx context.Context, workspaceID,
 	if s.HasRevisionError != nil {
 		return false, s.HasRevisionError
 	}
-	_, exists := s.Revisions[key]
+	_, exists := s.Revisions[revisionKey]
 	return exists, nil
 }
 
-func (s *MemoryDriveRevisionStore) PutRevision(ctx context.Context, workspaceID string, item DriveSourceItem) error {
+func (s *MemoryDriveRevisionStore) PutRevision(ctx context.Context, item DriveSourceItem) error {
 	if err := contextError(ctx); err != nil {
 		return err
 	}
 	if err := item.Validate(); err != nil {
-		return err
-	}
-	key, err := scopedRevisionKey(workspaceID, item.RevisionKey())
-	if err != nil {
 		return err
 	}
 	s.mu.Lock()
@@ -97,21 +145,50 @@ func (s *MemoryDriveRevisionStore) PutRevision(ctx context.Context, workspaceID 
 	if s.Revisions == nil {
 		s.Revisions = make(map[string]DriveSourceItem)
 	}
+	key := item.RevisionKey()
 	if _, exists := s.Revisions[key]; exists {
 		return ErrRevisionAlreadyExists
 	}
 	s.Revisions[key] = item
+	if s.RemovedFiles != nil {
+		delete(s.RemovedFiles, strings.TrimSpace(item.FileID))
+	}
 	return nil
+}
+
+func (s *MemoryDriveRevisionStore) MarkRemoved(ctx context.Context, fileID string, removedAt time.Time) error {
+	if err := contextError(ctx); err != nil {
+		return err
+	}
+	fileID = strings.TrimSpace(fileID)
+	if fileID == "" {
+		return ErrInvalidRevisionIdentity
+	}
+	if removedAt.IsZero() {
+		removedAt = time.Now().UTC()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.RemovedFiles == nil {
+		s.RemovedFiles = make(map[string]time.Time)
+	}
+	s.RemovedFiles[fileID] = removedAt.UTC()
+	return nil
+}
+
+func (s *MemoryDriveRevisionStore) RemovedAt(fileID string) (time.Time, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	removedAt, exists := s.RemovedFiles[strings.TrimSpace(fileID)]
+	return removedAt, exists
 }
 
 func (s *MemoryDriveRevisionStore) SaveCursor(ctx context.Context, state DriveSyncState) error {
 	if err := contextError(ctx); err != nil {
 		return err
 	}
-	state.WorkspaceID = strings.TrimSpace(state.WorkspaceID)
-	state.Cursor = normalizedCursor(state.Cursor)
-	if err := state.Validate(); err != nil {
-		return err
+	if state.WorkspaceID == "" {
+		return ErrInvalidWorkspaceID
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -125,6 +202,20 @@ func (s *MemoryDriveRevisionStore) SaveCursor(ctx context.Context, state DriveSy
 	return nil
 }
 
+func (s *MemoryDriveRevisionStore) LoadCursor(ctx context.Context, workspaceID string) (DriveSyncState, bool, error) {
+	if err := contextError(ctx); err != nil {
+		return DriveSyncState{}, false, err
+	}
+	workspaceID = strings.TrimSpace(workspaceID)
+	if workspaceID == "" {
+		return DriveSyncState{}, false, ErrInvalidWorkspaceID
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, exists := s.Cursors[workspaceID]
+	return state, exists, nil
+}
+
 func (s *MemoryDriveRevisionStore) RevisionCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -134,8 +225,14 @@ func (s *MemoryDriveRevisionStore) RevisionCount() int {
 func (s *MemoryDriveRevisionStore) Cursor(workspaceID string) (DriveSyncState, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	state, exists := s.Cursors[strings.TrimSpace(workspaceID)]
+	state, exists := s.Cursors[workspaceID]
 	return state, exists
+}
+
+func (s *MemoryDriveRevisionStore) SyncRunCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.SyncRuns)
 }
 
 // FakeGitHubReadClient is a deterministic read/import fixture.
@@ -192,16 +289,11 @@ func (f *FakeGitHubReadClient) ListRequestsSnapshot() []GitHubIssueListRequest {
 	return append([]GitHubIssueListRequest(nil), f.ListRequests...)
 }
 
-func (f *FakeGitHubReadClient) GetRequestsSnapshot() []string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return append([]string(nil), f.GetRequests...)
-}
-
 type MemoryGitHubRevisionStore struct {
 	mu               sync.Mutex
 	Revisions        map[string]GitHubImportItem
 	Cursors          map[string]GitHubSyncState
+	SyncRuns         map[string]MemorySyncRun
 	HasRevisionError error
 	PutRevisionError error
 	SaveCursorError  error
@@ -211,15 +303,50 @@ func NewMemoryGitHubRevisionStore() *MemoryGitHubRevisionStore {
 	return &MemoryGitHubRevisionStore{
 		Revisions: make(map[string]GitHubImportItem),
 		Cursors:   make(map[string]GitHubSyncState),
+		SyncRuns:  make(map[string]MemorySyncRun),
 	}
 }
 
-func (s *MemoryGitHubRevisionStore) HasRevision(ctx context.Context, workspaceID, revisionKey string) (bool, error) {
+func (s *MemoryGitHubRevisionStore) StartSyncRun(ctx context.Context, provider, workspaceID, target, cursorBefore string, startedAt time.Time) (string, error) {
 	if err := contextError(ctx); err != nil {
-		return false, err
+		return "", err
 	}
-	key, err := scopedRevisionKey(workspaceID, revisionKey)
-	if err != nil {
+	if strings.TrimSpace(workspaceID) == "" {
+		return "", ErrInvalidWorkspaceID
+	}
+	if startedAt.IsZero() {
+		startedAt = time.Now().UTC()
+	}
+	id := newSyncRunID(provider, workspaceID, target, startedAt)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.SyncRuns == nil {
+		s.SyncRuns = make(map[string]MemorySyncRun)
+	}
+	s.SyncRuns[id] = MemorySyncRun{ID: id, Provider: provider, WorkspaceID: workspaceID, Target: target, CursorBefore: cursorBefore, Status: "running", StartedAt: startedAt}
+	return id, nil
+}
+
+func (s *MemoryGitHubRevisionStore) CompleteSyncRun(ctx context.Context, runID, status string, summary SyncRunSummary, cursorAfter, errorCode string, completedAt time.Time) error {
+	if err := contextError(ctx); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	run, ok := s.SyncRuns[runID]
+	if !ok {
+		return ErrNotFound
+	}
+	if run.Status != "running" {
+		return ErrNotFound
+	}
+	run.Status, run.Summary, run.CursorAfter, run.ErrorCode, run.CompletedAt = status, summary, cursorAfter, errorCode, completedAt
+	s.SyncRuns[runID] = run
+	return nil
+}
+
+func (s *MemoryGitHubRevisionStore) HasRevision(ctx context.Context, revisionKey string) (bool, error) {
+	if err := contextError(ctx); err != nil {
 		return false, err
 	}
 	s.mu.Lock()
@@ -227,19 +354,15 @@ func (s *MemoryGitHubRevisionStore) HasRevision(ctx context.Context, workspaceID
 	if s.HasRevisionError != nil {
 		return false, s.HasRevisionError
 	}
-	_, exists := s.Revisions[key]
+	_, exists := s.Revisions[revisionKey]
 	return exists, nil
 }
 
-func (s *MemoryGitHubRevisionStore) PutRevision(ctx context.Context, workspaceID string, item GitHubImportItem) error {
+func (s *MemoryGitHubRevisionStore) PutRevision(ctx context.Context, item GitHubImportItem) error {
 	if err := contextError(ctx); err != nil {
 		return err
 	}
 	if err := item.Validate(); err != nil {
-		return err
-	}
-	key, err := scopedRevisionKey(workspaceID, item.RevisionKey())
-	if err != nil {
 		return err
 	}
 	s.mu.Lock()
@@ -250,6 +373,7 @@ func (s *MemoryGitHubRevisionStore) PutRevision(ctx context.Context, workspaceID
 	if s.Revisions == nil {
 		s.Revisions = make(map[string]GitHubImportItem)
 	}
+	key := item.RevisionKey()
 	if _, exists := s.Revisions[key]; exists {
 		return ErrRevisionAlreadyExists
 	}
@@ -261,11 +385,11 @@ func (s *MemoryGitHubRevisionStore) SaveCursor(ctx context.Context, state GitHub
 	if err := contextError(ctx); err != nil {
 		return err
 	}
-	state.WorkspaceID = strings.TrimSpace(state.WorkspaceID)
-	state.Repository = normalizeRepository(state.Repository)
-	state.Cursor = strings.TrimSpace(state.Cursor)
-	if err := state.Validate(); err != nil {
-		return err
+	if state.WorkspaceID == "" {
+		return ErrInvalidWorkspaceID
+	}
+	if normalizeRepository(state.Repository) == "" {
+		return ErrInvalidRepository
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -275,8 +399,26 @@ func (s *MemoryGitHubRevisionStore) SaveCursor(ctx context.Context, state GitHub
 	if s.Cursors == nil {
 		s.Cursors = make(map[string]GitHubSyncState)
 	}
-	s.Cursors[state.WorkspaceID+":"+state.Repository] = state
+	s.Cursors[state.WorkspaceID+":"+normalizeRepository(state.Repository)] = state
 	return nil
+}
+
+func (s *MemoryGitHubRevisionStore) LoadCursor(ctx context.Context, workspaceID, repository string) (GitHubSyncState, bool, error) {
+	if err := contextError(ctx); err != nil {
+		return GitHubSyncState{}, false, err
+	}
+	workspaceID = strings.TrimSpace(workspaceID)
+	repository = normalizeRepository(repository)
+	if workspaceID == "" {
+		return GitHubSyncState{}, false, ErrInvalidWorkspaceID
+	}
+	if repository == "" {
+		return GitHubSyncState{}, false, ErrInvalidRepository
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	state, exists := s.Cursors[workspaceID+":"+repository]
+	return state, exists, nil
 }
 
 func (s *MemoryGitHubRevisionStore) Cursor(workspaceID, repository string) (GitHubSyncState, bool) {
@@ -290,6 +432,12 @@ func (s *MemoryGitHubRevisionStore) RevisionCount() int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return len(s.Revisions)
+}
+
+func (s *MemoryGitHubRevisionStore) SyncRunCount() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.SyncRuns)
 }
 
 // FakeGitHubWriter is a deterministic safe-write fixture. It implements only
@@ -381,19 +529,29 @@ func NewMemorySafeWriteChallengeStore() *MemorySafeWriteChallengeStore {
 }
 
 func (s *MemorySafeWriteChallengeStore) Put(challenge SafeWriteChallenge) error {
-	if err := challenge.Validate(challenge.CreatedAt); err != nil {
-		return err
+	if stringsTrimEmpty(challenge.ID) || stringsTrimEmpty(challenge.UserID) || stringsTrimEmpty(challenge.TargetType) || stringsTrimEmpty(challenge.TargetID) || stringsTrimEmpty(challenge.ActionHash) || challenge.CreatedAt.IsZero() || challenge.ExpiresAt.IsZero() || !challenge.ExpiresAt.After(challenge.CreatedAt) || challenge.ExpiresAt.Sub(challenge.CreatedAt) > SafeWriteChallengeTTL {
+		return ErrInvalidChallenge
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.Challenges == nil {
 		s.Challenges = make(map[string]SafeWriteChallenge)
 	}
-	if _, exists := s.Challenges[challenge.ID]; exists {
-		return ErrInvalidChallenge
-	}
 	s.Challenges[challenge.ID] = challenge
 	return nil
+}
+
+func (s *MemorySafeWriteChallengeStore) Get(ctx context.Context, workspaceID, userID, challengeID string) (SafeWriteChallenge, error) {
+	if err := contextError(ctx); err != nil {
+		return SafeWriteChallenge{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	challenge, exists := s.Challenges[strings.TrimSpace(challengeID)]
+	if !exists || challenge.UserID != strings.TrimSpace(userID) || (strings.TrimSpace(workspaceID) != "" && challenge.WorkspaceID != strings.TrimSpace(workspaceID)) {
+		return SafeWriteChallenge{}, ErrInvalidChallenge
+	}
+	return challenge, nil
 }
 
 func (s *MemorySafeWriteChallengeStore) Consume(ctx context.Context, metadata SafeWriteMetadata, target SafeWriteTarget, now time.Time) error {
@@ -402,7 +560,7 @@ func (s *MemorySafeWriteChallengeStore) Consume(ctx context.Context, metadata Sa
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	challenge, exists := s.Challenges[strings.TrimSpace(metadata.ChallengeID)]
+	challenge, exists := s.Challenges[metadata.ChallengeID]
 	if !exists {
 		return ErrInvalidChallenge
 	}
@@ -412,39 +570,25 @@ func (s *MemorySafeWriteChallengeStore) Consume(ctx context.Context, metadata Sa
 	if !challenge.ExpiresAt.After(now) {
 		return ErrChallengeExpired
 	}
-	if err := metadata.ValidateConfirmation(now, target); err != nil {
-		return err
-	}
 	targetType, targetID := target.TargetTypeAndID()
-	if challenge.WorkspaceID != strings.TrimSpace(metadata.WorkspaceID) || challenge.UserID != strings.TrimSpace(metadata.UserID) || challenge.TargetType != targetType || challenge.TargetID != targetID || !strings.EqualFold(challenge.ActionHash, strings.TrimSpace(metadata.ActionHash)) {
+	if challenge.UserID != metadata.UserID || (metadata.WorkspaceID != "" && challenge.WorkspaceID != metadata.WorkspaceID) || challenge.TargetType != targetType || challenge.TargetID != targetID || challenge.ActionHash != metadata.ActionHash {
 		return ErrInvalidChallenge
 	}
-	if metadata.ConfirmedAt.Before(challenge.CreatedAt) || !metadata.ExpiresAt.Equal(challenge.ExpiresAt) {
-		return ErrInvalidChallenge
-	}
-	if expected, err := target.ActionHash(); err != nil || !strings.EqualFold(expected, challenge.ActionHash) {
+	if expected, err := target.ActionHash(); err != nil || expected != challenge.ActionHash {
 		return ErrInvalidChallenge
 	}
 	usedAt := now.UTC()
 	challenge.UsedAt = &usedAt
-	s.Challenges[strings.TrimSpace(metadata.ChallengeID)] = challenge
+	s.Challenges[metadata.ChallengeID] = challenge
 	return nil
 }
 
-func (s *MemorySafeWriteChallengeStore) Challenge(id string) (SafeWriteChallenge, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	challenge, exists := s.Challenges[strings.TrimSpace(id)]
-	if challenge.UsedAt != nil {
-		usedAt := *challenge.UsedAt
-		challenge.UsedAt = &usedAt
-	}
-	return challenge, exists
-}
-
 type MemorySafeWriteReceiptStore struct {
-	mu       sync.Mutex
-	Receipts map[string]SafeWriteReceipt
+	mu            sync.Mutex
+	Receipts      map[string]SafeWriteReceipt
+	ReserveError  error
+	CompleteError error
+	SaveError     error
 }
 
 func NewMemorySafeWriteReceiptStore() *MemorySafeWriteReceiptStore {
@@ -464,65 +608,87 @@ func (s *MemorySafeWriteReceiptStore) Lookup(ctx context.Context, workspaceID, u
 	return cloneSafeWriteReceipt(receipt), true, nil
 }
 
-func (s *MemorySafeWriteReceiptStore) Reserve(ctx context.Context, receipt SafeWriteReceipt) (SafeWriteReceipt, bool, error) {
+func (s *MemorySafeWriteReceiptStore) Save(ctx context.Context, receipt SafeWriteReceipt) error {
 	if err := contextError(ctx); err != nil {
-		return SafeWriteReceipt{}, false, err
+		return err
 	}
-	if err := validateReceiptForStore(receipt, SafeWriteReceiptPending); err != nil {
-		return SafeWriteReceipt{}, false, err
+	if stringsTrimEmpty(receipt.ID) || stringsTrimEmpty(receipt.UserID) || stringsTrimEmpty(receipt.IdempotencyKey) || stringsTrimEmpty(receipt.ActionHash) {
+		return ErrReceiptPersistence
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.SaveError != nil {
+		return s.SaveError
+	}
 	if s.Receipts == nil {
 		s.Receipts = make(map[string]SafeWriteReceipt)
 	}
 	key := receiptStoreKey(receipt.WorkspaceID, receipt.UserID, receipt.Operation, receipt.IdempotencyKey)
 	if previous, exists := s.Receipts[key]; exists {
-		if !receiptIdentityEqual(previous, receipt) {
-			return SafeWriteReceipt{}, false, ErrIdempotencyConflict
+		if previous.ActionHash != receipt.ActionHash {
+			return ErrIdempotencyConflict
 		}
+		return nil
+	}
+	s.Receipts[key] = cloneSafeWriteReceipt(receipt)
+	return nil
+}
+
+func (s *MemorySafeWriteReceiptStore) Reserve(ctx context.Context, receipt SafeWriteReceipt) (SafeWriteReceipt, bool, error) {
+	if err := contextError(ctx); err != nil {
+		return SafeWriteReceipt{}, false, err
+	}
+	if stringsTrimEmpty(receipt.ID) || stringsTrimEmpty(receipt.UserID) || stringsTrimEmpty(receipt.IdempotencyKey) || stringsTrimEmpty(receipt.ActionHash) || receipt.Status != SafeWriteReceiptPending {
+		return SafeWriteReceipt{}, false, ErrReceiptPersistence
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.ReserveError != nil {
+		return SafeWriteReceipt{}, false, s.ReserveError
+	}
+	if s.Receipts == nil {
+		s.Receipts = make(map[string]SafeWriteReceipt)
+	}
+	key := receiptStoreKey(receipt.WorkspaceID, receipt.UserID, receipt.Operation, receipt.IdempotencyKey)
+	if previous, exists := s.Receipts[key]; exists {
 		return cloneSafeWriteReceipt(previous), true, nil
 	}
 	s.Receipts[key] = cloneSafeWriteReceipt(receipt)
 	return cloneSafeWriteReceipt(receipt), false, nil
 }
 
-func (s *MemorySafeWriteReceiptStore) Save(ctx context.Context, receipt SafeWriteReceipt) error {
+func (s *MemorySafeWriteReceiptStore) Complete(ctx context.Context, receipt SafeWriteReceipt) error {
 	if err := contextError(ctx); err != nil {
 		return err
 	}
-	if err := validateReceiptForStore(receipt, receipt.Status); err != nil {
-		return err
+	if stringsTrimEmpty(receipt.ID) || stringsTrimEmpty(receipt.UserID) || stringsTrimEmpty(receipt.IdempotencyKey) || stringsTrimEmpty(receipt.ActionHash) || receipt.Status != SafeWriteReceiptAccepted {
+		return ErrReceiptPersistence
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.Receipts == nil {
-		s.Receipts = make(map[string]SafeWriteReceipt)
+	if s.CompleteError != nil {
+		return s.CompleteError
 	}
 	key := receiptStoreKey(receipt.WorkspaceID, receipt.UserID, receipt.Operation, receipt.IdempotencyKey)
-	if previous, exists := s.Receipts[key]; exists {
-		if !receiptIdentityEqual(previous, receipt) {
-			return ErrIdempotencyConflict
-		}
-		if receiptStatusRank(receipt.Status) < receiptStatusRank(previous.Status) {
-			return nil
-		}
-		if previous.Status == SafeWriteReceiptAccepted {
-			return nil
-		}
+	previous, exists := s.Receipts[key]
+	if !exists {
+		return ErrReceiptPersistence
+	}
+	if previous.ActionHash != receipt.ActionHash || previous.ID != receipt.ID {
+		return ErrIdempotencyConflict
+	}
+	if previous.Status == SafeWriteReceiptAccepted {
+		return nil
+	}
+	if previous.Status != SafeWriteReceiptPending {
+		return ErrReceiptPersistence
 	}
 	s.Receipts[key] = cloneSafeWriteReceipt(receipt)
 	return nil
 }
 
-func (s *MemorySafeWriteReceiptStore) ReceiptCount() int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return len(s.Receipts)
-}
-
 func receiptStoreKey(workspaceID, userID string, operation SafeWriteOperation, idempotencyKey string) string {
-	return strings.TrimSpace(workspaceID) + "\x00" + strings.TrimSpace(userID) + "\x00" + string(operation) + "\x00" + strings.TrimSpace(idempotencyKey)
+	return workspaceID + "\x00" + userID + "\x00" + string(operation) + "\x00" + idempotencyKey
 }
 
 func contextError(ctx context.Context) error {
@@ -536,44 +702,6 @@ func contextError(ctx context.Context) error {
 
 func stringsTrimEmpty(value string) bool {
 	return strings.TrimSpace(value) == ""
-}
-
-func validateReceiptForStore(receipt SafeWriteReceipt, expectedStatus string) error {
-	if stringsTrimEmpty(receipt.ID) || stringsTrimEmpty(receipt.WorkspaceID) || stringsTrimEmpty(receipt.UserID) || receipt.Operation == "" || stringsTrimEmpty(receipt.IdempotencyKey) || stringsTrimEmpty(receipt.ActionHash) || stringsTrimEmpty(receipt.TargetType) || stringsTrimEmpty(receipt.TargetID) || receipt.CreatedAt.IsZero() {
-		return ErrReceiptPersistence
-	}
-	switch receipt.Status {
-	case SafeWriteReceiptPending, SafeWriteReceiptUncertain, SafeWriteReceiptAccepted:
-	default:
-		return ErrReceiptPersistence
-	}
-	if expectedStatus != "" && receipt.Status != expectedStatus {
-		return ErrReceiptPersistence
-	}
-	return nil
-}
-
-func receiptIdentityEqual(left, right SafeWriteReceipt) bool {
-	return strings.TrimSpace(left.WorkspaceID) == strings.TrimSpace(right.WorkspaceID) &&
-		strings.TrimSpace(left.UserID) == strings.TrimSpace(right.UserID) &&
-		left.Operation == right.Operation &&
-		strings.TrimSpace(left.IdempotencyKey) == strings.TrimSpace(right.IdempotencyKey) &&
-		strings.EqualFold(strings.TrimSpace(left.ActionHash), strings.TrimSpace(right.ActionHash)) &&
-		strings.TrimSpace(left.TargetType) == strings.TrimSpace(right.TargetType) &&
-		strings.TrimSpace(left.TargetID) == strings.TrimSpace(right.TargetID)
-}
-
-func receiptStatusRank(status string) int {
-	switch status {
-	case SafeWriteReceiptPending:
-		return 1
-	case SafeWriteReceiptUncertain:
-		return 2
-	case SafeWriteReceiptAccepted:
-		return 3
-	default:
-		return 0
-	}
 }
 
 func cloneDrivePage(page DrivePage) DrivePage {

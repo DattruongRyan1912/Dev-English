@@ -25,17 +25,50 @@ func TestDeepSeekMissionRetriesInvalidStructuredOutput(t *testing.T) {
 		if requests == 2 {
 			content = `{"title":"Explain an API timeout","mode":"writing","skill":"technical_writing","skillLabel":"Technical Writing","level":"B1","context":"checkout API","prompt":"Describe the observed behavior, impact and next step.","targetVocabulary":["timeout"],"expectedPoints":["observed behavior","impact"],"estimatedMinutes":10}`
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": content}}}})
+		payload := map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": content}}}}
+		if requests == 2 {
+			payload["usage"] = map[string]int{"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18}
+		}
+		_ = json.NewEncoder(w).Encode(payload)
 	}))
 	defer server.Close()
 
 	provider := &DeepSeekProvider{APIKey: "test-key", BaseURL: server.URL, FastModel: "fast", Client: server.Client()}
-	mission, err := provider.GenerateMission(context.Background(), MissionRequest{LearningState: domain.LearningState{CEFR: "B1"}})
+	mission, usage, err := provider.GenerateMissionWithUsage(context.Background(), MissionRequest{LearningState: domain.LearningState{CEFR: "B1"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if requests != 2 || mission.ID == "" || mission.Status != "available" {
-		t.Fatalf("expected one validation retry and finalized mission, requests=%d mission=%+v", requests, mission)
+	if requests != 2 || mission.ID == "" || mission.Status != "available" || !usage.Available || usage.InputTokens != 11 || usage.OutputTokens != 7 || usage.TotalTokens != 18 || usage.Model != "fast" {
+		t.Fatalf("expected one validation retry, finalized mission and provider usage, requests=%d mission=%+v usage=%+v", requests, mission, usage)
+	}
+}
+
+func TestDeepSeekGenerateJSONRetriesTransientProviderFailure(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		if requests == 1 {
+			http.Error(w, "temporary upstream failure", http.StatusBadGateway)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []any{map[string]any{"message": map[string]string{"content": `{"ok":true}`}}},
+			"usage":   map[string]int{"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5},
+		})
+	}))
+	defer server.Close()
+
+	provider := &DeepSeekProvider{APIKey: "test-key", BaseURL: server.URL, FastModel: "fast", Client: server.Client()}
+	var output struct {
+		OK bool `json:"ok"`
+	}
+	usage, err := provider.GenerateJSON(context.Background(), "fast", "system", "user", &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 2 || !output.OK || !usage.Available || usage.TotalTokens != 5 {
+		t.Fatalf("expected bounded transient retry and reported usage, requests=%d output=%+v usage=%+v", requests, output, usage)
 	}
 }
 
@@ -59,6 +92,61 @@ func TestDeepSeekEvaluationRetriesInvalidStructuredOutput(t *testing.T) {
 	}
 	if requests != 2 || evaluation.Provider != "deepseek" || evaluation.Score != 80 {
 		t.Fatalf("expected one validation retry and provider metadata, requests=%d evaluation=%+v", requests, evaluation)
+	}
+}
+
+func TestDeepSeekRoleplayPromptRequiresAdaptiveBilingualHelp(t *testing.T) {
+	var systemPrompt string
+	var userPrompt string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/chat/completions" {
+			t.Fatalf("unexpected DeepSeek request: %s %s", r.Method, r.URL.Path)
+		}
+		var request struct {
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		for _, message := range request.Messages {
+			switch message.Role {
+			case "system":
+				systemPrompt = message.Content
+			case "user":
+				userPrompt = message.Content
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"content": `{"reply":"Mình chưa đánh giá nội dung kỹ thuật vì bạn đang cần gợi ý.\nI think we should start with the main issue.\nWhat happened first?","evaluation":{"score":0,"summary":"No technical answer was supplied","whatWasGood":[],"mainIssue":"The learner needs a starter","nextAction":"Reuse the starter sentence and add one detail","corrections":[],"technicalPoints":[]}}`}}}})
+	}))
+	defer server.Close()
+
+	provider := &DeepSeekProvider{APIKey: "test-key", BaseURL: server.URL, SmartModel: "smart", Client: server.Client()}
+	result, err := provider.GenerateRoleplay(context.Background(), RoleplayRequest{Scenario: domain.RoleplayScenario{Type: "technical-interview", Level: "A2", Goal: "Explain a blocked deployment"}, Answer: "Mình chưa biết nói thế nào, giúp mình với."})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, clause := range []string{
+		"If it is Vietnamese or asks for help or guidance",
+		"brief Vietnamese explanation",
+		"exactly one simple English starter sentence",
+		"do not pretend that the learner supplied a technical answer",
+		"nextAction must tell the learner to reuse the starter sentence and add one detail",
+		"continue the roleplay normally in English",
+		"scenario level",
+	} {
+		if !strings.Contains(systemPrompt, clause) {
+			t.Fatalf("adaptive prompt contract missing %q in %q", clause, systemPrompt)
+		}
+	}
+	if !strings.Contains(userPrompt, "Learner answer: Mình chưa biết nói thế nào") {
+		t.Fatalf("DeepSeek request did not include learner answer: %q", userPrompt)
+	}
+	if !result.GuidanceOnly || result.Evaluation.Provider != "deepseek" || result.Evaluation.Score != 0 {
+		t.Fatalf("unexpected adaptive DeepSeek result: %+v", result)
 	}
 }
 
@@ -230,5 +318,62 @@ func TestAzureTTSUsesEscapedSSMLAndReturnsAudio(t *testing.T) {
 	}
 	if string(audio) != "mp3" {
 		t.Fatalf("unexpected TTS audio: %q", audio)
+	}
+}
+
+func TestDeepSeekUsageAwareCopilotAndRoleplayKeepModelAccounting(t *testing.T) {
+	var models []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Model    string `json:"model"`
+			Messages []struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			} `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		models = append(models, request.Model)
+		userContent := ""
+		for _, message := range request.Messages {
+			if message.Role == "user" {
+				userContent = message.Content
+			}
+		}
+		content := `{"simple":"Please check the API.","natural":"Could you check the API?","professional":"Could you please check the API and confirm the result?","explanation":"These options keep the technical meaning."}`
+		if strings.Contains(userContent, "Scenario:") {
+			content = `{"reply":"That makes sense. What evidence supports this choice?","evaluation":{"score":80,"summary":"The answer identifies the technical choice.","whatWasGood":["It names the choice."],"mainIssue":"Add one concrete evidence detail.","nextAction":"State the evidence and the next step.","corrections":[],"technicalPoints":["technical choice"]}}`
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []any{map[string]any{"message": map[string]string{"content": content}}},
+			"usage":   map[string]int{"prompt_tokens": 17, "completion_tokens": 9, "total_tokens": 26},
+		})
+	}))
+	defer server.Close()
+
+	provider := &DeepSeekProvider{
+		APIKey: "test-key", BaseURL: server.URL, FastModel: "fast-model", SmartModel: "smart-model", Client: server.Client(),
+	}
+	copilot, copilotUsage, err := provider.GenerateCopilotWithUsage(context.Background(), CopilotRequest{Vietnamese: "Hãy kiểm tra API", Context: "release"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if copilot.Simple == "" || copilot.Natural == "" || copilot.Professional == "" || !copilotUsage.Available || copilotUsage.TotalTokens != 26 || copilotUsage.Model != "fast-model" {
+		t.Fatalf("copilot result/usage = %+v / %+v", copilot, copilotUsage)
+	}
+	roleplay, roleplayUsage, err := provider.GenerateRoleplayWithUsage(context.Background(), RoleplayRequest{
+		Scenario: domain.RoleplayScenario{Type: "technical-interview", Level: "A2", Goal: "Explain an API timeout"},
+		Answer:   "The API timed out because the database was slow.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if roleplay.Reply == "" || roleplay.Evaluation.Provider != "deepseek" || !roleplayUsage.Available || roleplayUsage.TotalTokens != 26 || roleplayUsage.Model != "smart-model" {
+		t.Fatalf("roleplay result/usage = %+v / %+v", roleplay, roleplayUsage)
+	}
+	if len(models) != 2 || models[0] != "fast-model" || models[1] != "smart-model" {
+		t.Fatalf("DeepSeek routing models = %v, want fast then smart", models)
 	}
 }

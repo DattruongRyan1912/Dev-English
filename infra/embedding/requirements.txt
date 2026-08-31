@@ -1,0 +1,6 @@
+fastapi==0.116.1
+sentence-transformers==5.1.0
+# Pin a pre-CUDA ARM64-compatible PyTorch release. Without this pin pip picks
+# the newest Linux wheel and pulls the full CUDA 13 stack into the CPU sidecar.
+torch==2.6.0
+uvicorn[standard]==0.35.0

@@ -42,6 +42,54 @@ type Scope struct {
 	UserID      string `json:"userId"`
 }
 
+// ContextRef identifies one canonical entity that the assistant should keep
+// in focus for a conversation. It is deliberately a small reference rather
+// than an embedded document so the application service remains the only
+// authority that resolves and scopes the underlying data.
+type ContextRef struct {
+	Type string `json:"type"`
+	ID   string `json:"id"`
+}
+
+const (
+	ContextProject  = "project"
+	ContextTask     = "task"
+	ContextDecision = "decision"
+	ContextSource   = "source"
+)
+
+func (c ContextRef) IsZero() bool {
+	return strings.TrimSpace(c.Type) == "" && strings.TrimSpace(c.ID) == ""
+}
+
+// Normalize validates and canonicalizes a context reference. An all-empty
+// reference means that the conversation is not pinned to an entity; a
+// partially populated reference is always invalid.
+func (c ContextRef) Normalize() (ContextRef, error) {
+	c.Type = strings.ToLower(strings.TrimSpace(c.Type))
+	c.ID = strings.TrimSpace(c.ID)
+	if c.IsZero() {
+		return ContextRef{}, nil
+	}
+	if c.Type == "" || c.ID == "" {
+		return ContextRef{}, invalidField("context", "type and id must be provided together")
+	}
+	switch c.Type {
+	case ContextProject, ContextTask, ContextDecision, ContextSource:
+	default:
+		return ContextRef{}, invalidField("context.type", "must be project, task, decision, or source")
+	}
+	if err := validateIdentifier("context.id", c.ID); err != nil {
+		return ContextRef{}, err
+	}
+	return c, nil
+}
+
+func (c ContextRef) Validate() error {
+	_, err := c.Normalize()
+	return err
+}
+
 // UnknownAnswer is the deterministic fail-closed answer used when the model
 // supplied no verifiable citation. The original ungrounded model answer is
 // intentionally not returned to the caller.
@@ -167,12 +215,23 @@ type AskRequest struct {
 	Scope          Scope
 	ConversationID string
 	Message        string
+	History        []ConversationTurn
+	Context        ContextRef
+}
+
+// ConversationTurn is the bounded, provider-neutral history passed to a
+// generator. It contains only already-persisted text turns; provider metadata
+// and action receipts never enter this prompt boundary.
+type ConversationTurn struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type RetrievalRequest struct {
 	Scope          Scope
 	ConversationID string
 	Query          string
+	Context        ContextRef
 }
 
 type GenerationRequest struct {
@@ -180,6 +239,8 @@ type GenerationRequest struct {
 	ConversationID string
 	Message        string
 	Evidence       []Evidence
+	History        []ConversationTurn
+	Context        ContextRef
 }
 
 type Retriever interface {
@@ -226,11 +287,17 @@ func (s *Service) Ask(ctx context.Context, request AskRequest) (AssistantRespons
 	if err := validateOptionalIdentifier("conversationId", request.ConversationID); err != nil {
 		return AssistantResponse{}, err
 	}
+	normalizedContext, err := request.Context.Normalize()
+	if err != nil {
+		return AssistantResponse{}, err
+	}
+	request.Context = normalizedContext
 
 	evidence, err := s.retriever.Search(ctx, RetrievalRequest{
 		Scope:          request.Scope,
 		ConversationID: request.ConversationID,
 		Query:          request.Message,
+		Context:        request.Context,
 	})
 	if err != nil {
 		return AssistantResponse{}, dependencyFailure("retrieval", err)
@@ -247,6 +314,8 @@ func (s *Service) Ask(ctx context.Context, request AskRequest) (AssistantRespons
 		ConversationID: request.ConversationID,
 		Message:        request.Message,
 		Evidence:       cloneEvidence(prepared),
+		History:        cloneConversationTurns(request.History),
+		Context:        request.Context,
 	})
 	if err != nil {
 		return AssistantResponse{}, dependencyFailure("generation", err)
@@ -673,17 +742,6 @@ func staleKey(item Evidence) string {
 	return item.ID
 }
 
-func cleanTextList(input []string) []string {
-	result := make([]string, 0, len(input))
-	for _, value := range input {
-		value = strings.TrimSpace(value)
-		if value != "" {
-			result = appendUnique(result, value)
-		}
-	}
-	return result
-}
-
 func appendUnique(values []string, value string) []string {
 	for _, current := range values {
 		if current == value {
@@ -695,6 +753,15 @@ func appendUnique(values []string, value string) []string {
 
 func cloneEvidence(input []Evidence) []Evidence {
 	result := make([]Evidence, len(input))
+	copy(result, input)
+	return result
+}
+
+func cloneConversationTurns(input []ConversationTurn) []ConversationTurn {
+	if len(input) == 0 {
+		return []ConversationTurn{}
+	}
+	result := make([]ConversationTurn, len(input))
 	copy(result, input)
 	return result
 }

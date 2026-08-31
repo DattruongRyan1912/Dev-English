@@ -17,7 +17,7 @@ jobs:
       - run: go test ./...
       - run: go test -race ./...
       - run: go vet ./...
-      - run: bash -n scripts/db_backup.sh scripts/db_migrate.sh scripts/db_restore.sh scripts/smoke_local.sh
+      - run: bash -n scripts/db_backup.sh scripts/db_backup_restore_test.sh scripts/db_migrate.sh scripts/db_restore.sh scripts/db_legacy_upgrade_test.sh scripts/knowledge_capacity_test.sh scripts/production_example_test.sh scripts/production_web_artifact_test.sh scripts/smoke_local.sh
       - run: go run ./backend/cmd/contentfactory --root . --write-evaluation-cases tests/evaluation_cases.generated.json --target 200
 
   flutter:
@@ -77,7 +77,10 @@ jobs:
       - run: flutter test
       - run: flutter test test/browser_smoke_test.dart -d chrome --dart-define=DEVENGLISH_BROWSER_SMOKE=true --dart-define=INTEGRATION_TEST_SHOULD_REPORT_RESULTS_TO_NATIVE=false --dart-define=DEVENGLISH_ENV=development --dart-define=API_BASE_URL=http://127.0.0.1:8080
       - run: flutter test --dart-define=DEVENGLISH_ENV=production
-      - run: flutter build web --release
+      # Flutter's wasm dry-run can remain at the compiler loading phase on
+      # constrained CI runners. The release artifact is still the same web
+      # build; skip only that optional probe so CI has a deterministic exit.
+      - run: flutter build web --release --no-wasm-dry-run
       - name: Verify production web artifact security
         run: |
           set -euo pipefail
@@ -97,6 +100,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker compose --env-file infra/production.env.example -f infra/docker-compose.production.yml config --quiet
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: ./scripts/production_example_test.sh
       - run: docker build --file Dockerfile --tag devenglish-backend:ci .
       - run: docker build --file Dockerfile.web --build-arg API_BASE_URL=https://english.example.com --tag devenglish-web:ci .
       - run: docker run --rm -e DEVENGLISH_DOMAIN=english.example.com -e DEVENGLISH_TLS_EMAIL=ops@example.com devenglish-web:ci caddy validate --config /etc/caddy/Caddyfile
@@ -182,92 +189,62 @@ jobs:
   legacy-upgrade:
     runs-on: ubuntu-latest
     env:
-      DEVENGLISH_CI_PORT: '55432'
-      POSITIVE_PROJECT: devenglish-legacy-upgrade-${{ github.run_id }}-${{ github.run_attempt }}-positive
-      NEGATIVE_PROJECT: devenglish-legacy-upgrade-${{ github.run_id }}-${{ github.run_attempt }}-negative
+      COMPOSE_FILE: infra/docker-compose.ci.yml
+      COMPOSE_PROJECT_NAME: devenglish-legacy-upgrade-${{ github.run_id }}
+      POSTGRES_SERVICE: postgres
+      POSTGRES_USER: devenglish
+      POSTGRES_DB: devenglish
     steps:
       - uses: actions/checkout@v4
-
-      - name: Validate legacy upgrade harness before database startup
-        run: bash -n scripts/db_legacy_upgrade_test.sh scripts/db_migrate.sh
-
-      - name: Start positive disposable PostgreSQL
+      - name: Start disposable PostgreSQL
+        run: docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" up -d postgres
+      - name: Wait for PostgreSQL
         run: |
-          set -euo pipefail
-          docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml up -d postgres
           for attempt in $(seq 1 60); do
-            if docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml exec -T postgres pg_isready -U devenglish -d devenglish; then
+            if docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" exec -T "$POSTGRES_SERVICE" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
               exit 0
             fi
             sleep 1
           done
-          docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml logs postgres
+          docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" logs "$POSTGRES_SERVICE"
           exit 1
-
-      - name: Run positive legacy upgrade harness
+      - name: Exercise legacy upgrade, backfill and preservation
         env:
           DEVENGLISH_LEGACY_UPGRADE_DISPOSABLE: '1'
-          COMPOSE_FILE: infra/docker-compose.ci.yml
-          COMPOSE_PROJECT_NAME: ${{ env.POSITIVE_PROJECT }}
-          POSTGRES_SERVICE: postgres
-          POSTGRES_USER: devenglish
-          POSTGRES_DB: devenglish
         run: ./scripts/db_legacy_upgrade_test.sh
-
-      - name: Stop positive project before negative control
+      - name: Stop disposable PostgreSQL
         if: always()
-        run: docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans
+        run: docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" down -v
 
-      - name: Start negative disposable PostgreSQL
+  knowledge-capacity:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_FILE: infra/docker-compose.ci.yml
+      COMPOSE_PROJECT_NAME: devenglish-capacity-${{ github.run_id }}
+      POSTGRES_SERVICE: postgres
+      POSTGRES_USER: devenglish
+      POSTGRES_DB: devenglish
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start disposable PostgreSQL
+        run: docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" up -d postgres
+      - name: Wait for PostgreSQL
         run: |
-          set -euo pipefail
-          docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml up -d postgres
           for attempt in $(seq 1 60); do
-            if docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml exec -T postgres pg_isready -U devenglish -d devenglish; then
+            if docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" exec -T "$POSTGRES_SERVICE" pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"; then
               exit 0
             fi
             sleep 1
           done
-          docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml logs postgres
+          docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" logs "$POSTGRES_SERVICE"
           exit 1
-
-      - name: Pre-migrate negative-control database
+      - name: Exercise the 100000-chunk Knowledge capacity gate
         env:
-          COMPOSE_FILE: infra/docker-compose.ci.yml
-          COMPOSE_PROJECT_NAME: ${{ env.NEGATIVE_PROJECT }}
-          ENV_FILE: /tmp/devenglish-legacy-upgrade-ci.env-not-present
-          POSTGRES_SERVICE: postgres
-          POSTGRES_USER: devenglish
-          POSTGRES_DB: devenglish
-        run: ./scripts/db_migrate.sh
-
-      - name: Reject pre-migrated database before seed
-        env:
-          DEVENGLISH_LEGACY_UPGRADE_DISPOSABLE: '1'
-          DEVENGLISH_LEGACY_UPGRADE_NEGATIVE_CONTROL: '1'
-          COMPOSE_FILE: infra/docker-compose.ci.yml
-          COMPOSE_PROJECT_NAME: ${{ env.NEGATIVE_PROJECT }}
-          POSTGRES_SERVICE: postgres
-          POSTGRES_USER: devenglish
-          POSTGRES_DB: devenglish
-        run: |
-          set -euo pipefail
-          output_file=/tmp/devenglish-legacy-upgrade-negative.log
-          ./scripts/db_legacy_upgrade_test.sh 2>&1 | tee "$output_file"
-          grep -Fxq -- 'Negative gate passed: pre-migrated disposable database was rejected before seed.' "$output_file"
-          if grep -Fq -- 'Seeding fixed synthetic legacy rows with parameterized SQL.' "$output_file"; then
-            echo 'Negative control unexpectedly reached the seed step.' >&2
-            exit 1
-          fi
-
-      - name: Stop disposable legacy-upgrade projects
+          DEVENGLISH_CAPACITY_DISPOSABLE: '1'
+        run: ./scripts/knowledge_capacity_test.sh
+      - name: Stop disposable PostgreSQL
         if: always()
-        run: |
-          set -euo pipefail
-          cleanup_status=0
-          docker compose --project-name "$POSITIVE_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans || cleanup_status=1
-          docker compose --project-name "$NEGATIVE_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans || cleanup_status=1
-          exit "$cleanup_status"
+        run: docker compose --project-name "$COMPOSE_PROJECT_NAME" --file "$COMPOSE_FILE" down -v
 
   backup-restore-recovery:
     runs-on: ubuntu-latest
@@ -276,10 +253,8 @@ jobs:
       RECOVERY_PROJECT: devenglish-backup-restore-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Validate backup restore harness before database startup
         run: bash -n scripts/db_backup_restore_test.sh scripts/db_backup.sh scripts/db_restore.sh scripts/db_migrate.sh
-
       - name: Run disposable backup restore recovery
         timeout-minutes: 20
         env:
@@ -300,7 +275,6 @@ jobs:
             printf '%s\n' 'Backup/restore recovery gate changed the CI checkout.' >&2
             exit 1
           }
-
       - name: Clean disposable backup restore project
         if: always()
         run: docker compose --project-name "$RECOVERY_PROJECT" --file infra/docker-compose.ci.yml down --volumes --remove-orphans

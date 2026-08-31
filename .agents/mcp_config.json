@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "cyberos": {
+      "command": "node",
+      "args": [
+        ".cyberos/mcp/cyberos-mcp.mjs"
+      ]
+    }
+  }
+}

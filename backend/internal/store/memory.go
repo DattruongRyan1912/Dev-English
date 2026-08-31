@@ -29,6 +29,12 @@ type MemoryStore struct {
 	conversations  map[string]domain.Conversation
 	speaking       map[string]domain.SpeakingSession
 	usage          []domain.UsageRecord
+	reservations   map[string]memoryUsageReservation
+}
+
+type memoryUsageReservation struct {
+	request UsageReservationRequest
+	status  string
 }
 
 func NewSeeded(now time.Time) *MemoryStore {
@@ -90,6 +96,7 @@ func NewSeeded(now time.Time) *MemoryStore {
 		conversations: map[string]domain.Conversation{},
 		speaking:      map[string]domain.SpeakingSession{},
 		usage:         []domain.UsageRecord{},
+		reservations:  map[string]memoryUsageReservation{},
 	}
 }
 
@@ -508,11 +515,77 @@ func (s *MemoryStore) SaveUsage(_ context.Context, record domain.UsageRecord) er
 	return nil
 }
 
+func (s *MemoryStore) ReserveUsage(_ context.Context, request UsageReservationRequest) (bool, error) {
+	if request.ID == "" || request.UserID == "" || request.MonthStart.IsZero() ||
+		request.Amount <= 0 || request.Limit <= 0 {
+		return false, errors.New("invalid usage reservation")
+	}
+	if request.Metric != UsageMetricTokens && request.Metric != UsageMetricCost {
+		return false, errors.New("invalid usage reservation metric")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if existing, ok := s.reservations[request.ID]; ok {
+		return existing.status == "active" || existing.status == "committed", nil
+	}
+	now := time.Now().UTC()
+	monthEnd := request.MonthStart.UTC().AddDate(0, 1, 0)
+	used := 0.0
+	for _, record := range s.usage {
+		if record.CreatedAt.Before(request.MonthStart) || !record.CreatedAt.Before(monthEnd) {
+			continue
+		}
+		if request.Feature != "" && record.Feature != request.Feature {
+			continue
+		}
+		if request.Metric == UsageMetricTokens {
+			used += float64(record.InputTokens + record.OutputTokens)
+		} else {
+			used += record.EstimatedCost
+		}
+	}
+	reserved := 0.0
+	for _, existing := range s.reservations {
+		if existing.status != "active" ||
+			!existing.request.ExpiresAt.IsZero() && !existing.request.ExpiresAt.After(now) {
+			continue
+		}
+		if existing.request.UserID == request.UserID &&
+			existing.request.MonthStart.Equal(request.MonthStart) &&
+			existing.request.Feature == request.Feature &&
+			existing.request.Metric == request.Metric {
+			reserved += existing.request.Amount
+		}
+	}
+	if used+reserved+request.Amount > request.Limit {
+		return false, nil
+	}
+	s.reservations[request.ID] = memoryUsageReservation{request: request, status: "active"}
+	return true, nil
+}
+
+func (s *MemoryStore) CompleteUsageReservation(_ context.Context, id string, committed bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	reservation, ok := s.reservations[id]
+	if !ok || reservation.status != "active" {
+		return nil
+	}
+	if committed {
+		reservation.status = "committed"
+	} else {
+		reservation.status = "released"
+	}
+	s.reservations[id] = reservation
+	return nil
+}
+
 func (s *MemoryStore) DeleteUserData(context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.user = domain.User{}
 	s.learningState = domain.LearningState{}
+	s.reservations = map[string]memoryUsageReservation{}
 	s.missions = map[string]domain.Mission{}
 	s.attempts = nil
 	s.mistakes = map[string]domain.Mistake{}

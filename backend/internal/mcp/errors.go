@@ -18,6 +18,7 @@ var (
 	ErrTokenExpired          = errors.New("MCP bearer token expired")
 	ErrTokenRevoked          = errors.New("MCP bearer token revoked")
 	ErrTokenAlreadyRevealed  = errors.New("MCP token has already been revealed")
+	ErrTokenPersistence      = errors.New("MCP token persistence failed")
 	ErrInvalidAuthorization  = errors.New("invalid MCP authorization header")
 	ErrReplayDetected        = errors.New("MCP request replay detected")
 	ErrIdempotencyConflict   = errors.New("MCP idempotency key conflict")
@@ -44,6 +45,7 @@ const (
 	ReplayError        = -32004
 	IdempotencyError   = -32005
 	UnsupportedVersion = -32006
+	ConflictError      = -32007
 )
 
 // RPCError is a JSON-RPC error object. Data is deliberately optional and

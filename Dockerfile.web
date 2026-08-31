@@ -10,10 +10,12 @@ COPY lib ./lib
 COPY web ./web
 
 ARG API_BASE_URL
+ARG WORKSPACE_SHELL=new
 RUN test -n "$API_BASE_URL"
 RUN flutter build web \
     --release \
     --dart-define=DEVENGLISH_ENV=production \
+    --dart-define=DEVENGLISH_WORKSPACE_SHELL="$WORKSPACE_SHELL" \
     --dart-define=API_BASE_URL="$API_BASE_URL"
 
 FROM caddy:2-alpine

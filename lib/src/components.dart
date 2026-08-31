@@ -1,7 +1,139 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'models.dart';
 import 'theme.dart';
+
+class AppSurface extends StatelessWidget {
+  const AppSurface({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.color = AppColors.surface,
+    this.borderColor = AppColors.border,
+    this.radius = AppRadius.medium,
+    this.margin,
+  });
+
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  final Color color;
+  final Color borderColor;
+  final double radius;
+  final EdgeInsetsGeometry? margin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: margin,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: borderColor),
+      ),
+      child: child,
+    );
+  }
+}
+
+class AppIconBadge extends StatelessWidget {
+  const AppIconBadge({
+    super.key,
+    required this.icon,
+    this.color = AppColors.accent,
+    this.backgroundColor = AppColors.accentSoft,
+    this.size = 40,
+  });
+
+  final IconData icon;
+  final Color color;
+  final Color backgroundColor;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(AppRadius.small),
+      ),
+      child: Icon(icon, color: color, size: size * 0.52),
+    );
+  }
+}
+
+class StatusPill extends StatelessWidget {
+  const StatusPill({
+    super.key,
+    required this.label,
+    required this.color,
+    this.icon,
+  });
+
+  final String label;
+  final Color color;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minHeight: 28),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 5),
+          ],
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 240),
+            child: Text(
+              label,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class EyebrowLabel extends StatelessWidget {
+  const EyebrowLabel(
+    this.text, {
+    super.key,
+    this.color = AppColors.textTertiary,
+  });
+
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+}
 
 class PageFrame extends StatelessWidget {
   const PageFrame({
@@ -89,7 +221,16 @@ class SectionTitle extends StatelessWidget {
           child: Text(title, style: Theme.of(context).textTheme.titleMedium),
         ),
         if (trailing != null)
-          Text(trailing!, style: Theme.of(context).textTheme.bodyMedium),
+          Flexible(
+            fit: FlexFit.loose,
+            child: Text(
+              trailing!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
       ],
     );
   }
@@ -297,7 +438,7 @@ class FocusHeader extends StatelessWidget {
   }
 }
 
-class HoldToTalkButton extends StatelessWidget {
+class HoldToTalkButton extends StatefulWidget {
   const HoldToTalkButton({
     super.key,
     required this.enabled,
@@ -314,46 +455,112 @@ class HoldToTalkButton extends StatelessWidget {
   final VoidCallback onPressCancel;
 
   @override
+  State<HoldToTalkButton> createState() => _HoldToTalkButtonState();
+}
+
+class _HoldToTalkButtonState extends State<HoldToTalkButton> {
+  var _keyboardPressActive = false;
+  var _hasFocus = false;
+
+  @override
+  void didUpdateWidget(covariant HoldToTalkButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled && _keyboardPressActive) {
+      _keyboardPressActive = false;
+      widget.onPressCancel();
+    }
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (!widget.enabled ||
+        (event.logicalKey != LogicalKeyboardKey.space &&
+            event.logicalKey != LogicalKeyboardKey.enter)) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event is KeyDownEvent) {
+      if (!_keyboardPressActive && !widget.recording) {
+        _keyboardPressActive = true;
+        widget.onPressStart();
+      }
+      return KeyEventResult.handled;
+    }
+    if (event is KeyUpEvent) {
+      if (_keyboardPressActive) {
+        _keyboardPressActive = false;
+        widget.onPressEnd();
+      }
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.handled;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final background = recording ? AppColors.warning : AppColors.accent;
+    final background = widget.recording ? AppColors.warning : AppColors.accent;
     return Semantics(
       button: true,
-      label: recording ? 'Release to transcribe' : 'Hold to talk',
-      hint: 'Press and hold while speaking, then release to transcribe.',
-      child: GestureDetector(
-        key: const ValueKey('hold-to-talk'),
-        behavior: HitTestBehavior.opaque,
-        onTapDown: enabled ? (_) => onPressStart() : null,
-        onTapUp: enabled ? (_) => onPressEnd() : null,
-        onTapCancel: enabled ? onPressCancel : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          width: double.infinity,
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
-          ),
-          decoration: BoxDecoration(
-            color: enabled ? background : AppColors.border,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                recording ? Icons.stop_circle_outlined : Icons.mic_none,
-                color: enabled ? Colors.white : AppColors.textSecondary,
+      enabled: widget.enabled,
+      label: widget.recording ? 'Release to transcribe' : 'Hold to talk',
+      hint:
+          'Press and hold while speaking, then release to transcribe. You can also hold Space or Enter.',
+      child: Focus(
+        key: const ValueKey('hold-to-talk-focus'),
+        canRequestFocus: widget.enabled,
+        skipTraversal: !widget.enabled,
+        onKeyEvent: _handleKeyEvent,
+        onFocusChange: (focused) {
+          if (!focused && _keyboardPressActive) {
+            _keyboardPressActive = false;
+            widget.onPressCancel();
+          }
+          if (mounted) setState(() => _hasFocus = focused);
+        },
+        child: GestureDetector(
+          key: const ValueKey('hold-to-talk'),
+          behavior: HitTestBehavior.opaque,
+          onTapDown: widget.enabled ? (_) => widget.onPressStart() : null,
+          onTapUp: widget.enabled ? (_) => widget.onPressEnd() : null,
+          onTapCancel: widget.enabled ? widget.onPressCancel : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.lg,
+              vertical: AppSpacing.md,
+            ),
+            decoration: BoxDecoration(
+              color: widget.enabled ? background : AppColors.border,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _hasFocus ? AppColors.textPrimary : Colors.transparent,
+                width: 2,
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                recording ? 'Release to transcribe' : 'Hold to talk',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: enabled ? Colors.white : AppColors.textSecondary,
-                  fontWeight: FontWeight.w600,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  widget.recording
+                      ? Icons.stop_circle_outlined
+                      : Icons.mic_none,
+                  color: widget.enabled
+                      ? Colors.white
+                      : AppColors.textSecondary,
                 ),
-              ),
-            ],
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  widget.recording ? 'Release to transcribe' : 'Hold to talk',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: widget.enabled
+                        ? Colors.white
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -379,38 +586,42 @@ class LearningSupportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return AppSurface(
       color: AppColors.accentSoft,
-      child: ExpansionTile(
-        key: const ValueKey('learning-overlay'),
-        leading: const Icon(Icons.lightbulb_outline, color: AppColors.accent),
-        title: Text(title),
-        subtitle: const Text(
-          'Short Vietnamese guidance and one English starter. Open only when needed.',
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(
-          AppSpacing.xl,
-          0,
-          AppSpacing.xl,
-          AppSpacing.lg,
-        ),
-        children: [
-          _SupportBlock(title: 'Giải thích ngắn', body: explanation),
-          const SizedBox(height: AppSpacing.md),
-          _SupportBlock(
-            title: 'English starter',
-            body: starter,
-            action: onSpeak == null
-                ? null
-                : IconButton(
-                    onPressed: () => onSpeak!(starter),
-                    tooltip: 'Listen to English starter',
-                    icon: const Icon(Icons.volume_up_outlined),
-                  ),
+      padding: EdgeInsets.zero,
+      child: Material(
+        color: Colors.transparent,
+        child: ExpansionTile(
+          key: const ValueKey('learning-overlay'),
+          leading: const Icon(Icons.lightbulb_outline, color: AppColors.accent),
+          title: Text(title),
+          subtitle: const Text(
+            'Short Vietnamese guidance and one English starter. Open only when needed.',
           ),
-          const SizedBox(height: AppSpacing.md),
-          _SupportBlock(title: 'Try this next', body: followUp),
-        ],
+          childrenPadding: const EdgeInsets.fromLTRB(
+            AppSpacing.xl,
+            0,
+            AppSpacing.xl,
+            AppSpacing.lg,
+          ),
+          children: [
+            _SupportBlock(title: 'Giải thích ngắn', body: explanation),
+            const SizedBox(height: AppSpacing.md),
+            _SupportBlock(
+              title: 'English starter',
+              body: starter,
+              action: onSpeak == null
+                  ? null
+                  : IconButton(
+                      onPressed: () => onSpeak!(starter),
+                      tooltip: 'Listen to English starter',
+                      icon: const Icon(Icons.volume_up_outlined),
+                    ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _SupportBlock(title: 'Try this next', body: followUp),
+          ],
+        ),
       ),
     );
   }

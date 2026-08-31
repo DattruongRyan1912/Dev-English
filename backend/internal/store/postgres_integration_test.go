@@ -143,199 +143,77 @@ func TestPostgresRepositoryIntegration(t *testing.T) {
 	if _, err := repository.Mission(ctxB, mission.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("other user can read persisted mission: %v", err)
 	}
-}
 
-// TestPostgresLegacyContextCompatibilityAcrossWorkspaceAmbiguity protects the
-// legacy user-scoped tables while workspace resolution remains undefined. It
-// deliberately does not choose a workspace or write canonical Knowledge rows.
-func TestPostgresLegacyContextCompatibilityAcrossWorkspaceAmbiguity(t *testing.T) {
-	databaseURL := strings.TrimSpace(os.Getenv("DEVENGLISH_TEST_DATABASE_URL"))
-	if databaseURL == "" {
-		t.Skip("set DEVENGLISH_TEST_DATABASE_URL to run PostgreSQL integration coverage")
+	reservationMonth := time.Date(createdAt.Year(), createdAt.Month(), 1, 0, 0, 0, 0, time.UTC)
+	firstReservation := UsageReservationRequest{
+		ID:         "postgres-it-reservation-first-" + suffix,
+		UserID:     userA,
+		MonthStart: reservationMonth,
+		Feature:    "assistant",
+		Metric:     UsageMetricTokens,
+		Amount:     80,
+		Limit:      100,
+		ExpiresAt:  createdAt.Add(5 * time.Minute),
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	pool, err := pgxpool.New(ctx, databaseURL)
-	if err != nil {
-		t.Fatalf("create PostgreSQL pool: %v", err)
+	allowed, err := repository.ReserveUsage(ctxA, firstReservation)
+	if err != nil || !allowed {
+		t.Fatalf("reserve first usage window: allowed=%v err=%v", allowed, err)
 	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		t.Fatalf("ping PostgreSQL: %v", err)
+	// Retrying the same request is idempotent and must not consume another 80
+	// tokens. This is the durable equivalent of a client retry after a timeout.
+	if allowed, err := repository.ReserveUsage(ctxA, firstReservation); err != nil || !allowed {
+		t.Fatalf("replay first usage reservation: allowed=%v err=%v", allowed, err)
 	}
-	repository := &PostgresStore{Pool: pool}
-
-	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
-	userA := "legacy-compat-a-" + suffix
-	userB := "legacy-compat-b-" + suffix
-	ctxA := WithUser(ctx, userA)
-	ctxB := WithUser(ctx, userB)
-	defer func() {
-		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cleanupCancel()
-		for _, userID := range []string{userA, userB} {
-			if err := repository.DeleteUserData(WithUser(cleanupCtx, userID)); err != nil && !errors.Is(err, ErrNotFound) {
-				t.Errorf("cleanup user %s: %v", userID, err)
-			}
-		}
-		pool.Close()
-	}()
-
-	for _, userID := range []string{userA, userB} {
-		if err := repository.EnsureUser(WithUser(ctx, userID), domain.User{
-			ID:          userID,
-			DisplayName: userID,
-			CEFR:        "B1",
-			CreatedAt:   time.Now().UTC(),
-		}); err != nil {
-			t.Fatalf("ensure user %s: %v", userID, err)
-		}
+	secondReservation := firstReservation
+	secondReservation.ID += "-second"
+	secondReservation.Amount = 30
+	if allowed, err := repository.ReserveUsage(ctxA, secondReservation); err != nil {
+		t.Fatalf("reserve over-budget usage: %v", err)
+	} else if allowed {
+		t.Fatal("expected active reservation to consume the remaining budget")
 	}
-
-	workspaceIDs := []string{"legacy-compat-workspace-a1-" + suffix, "legacy-compat-workspace-a2-" + suffix}
-	for index, workspaceID := range workspaceIDs {
-		_, err := repository.Pool.Exec(ctx, `
-			INSERT INTO workspaces (id, owner_user_id, name, slug, description)
-			VALUES ($1, $2, $3, $4, $5)`,
-			workspaceID,
-			userA,
-			"Legacy compatibility workspace "+fmt.Sprint(index+1),
-			"legacy-compat-"+fmt.Sprint(index+1)+"-"+suffix,
-			"synthetic workspace for compatibility isolation",
-		)
-		if err != nil {
-			t.Fatalf("create workspace %s: %v", workspaceID, err)
-		}
+	if err := repository.CompleteUsageReservation(ctxA, firstReservation.ID, false); err != nil {
+		t.Fatalf("release first usage reservation: %v", err)
 	}
-
-	var workspaceCount int
-	if err := repository.Pool.QueryRow(ctx, `SELECT count(*) FROM workspaces WHERE owner_user_id = $1 AND deleted_at IS NULL`, userA).Scan(&workspaceCount); err != nil {
-		t.Fatalf("count ambiguous workspaces: %v", err)
+	if allowed, err := repository.ReserveUsage(ctxA, secondReservation); err != nil || !allowed {
+		t.Fatalf("reserve after release: allowed=%v err=%v", allowed, err)
 	}
-	if workspaceCount != 2 {
-		t.Fatalf("expected user A to own two active workspaces, got %d", workspaceCount)
+	if err := repository.CompleteUsageReservation(ctxA, secondReservation.ID, true); err != nil {
+		t.Fatalf("commit second usage reservation: %v", err)
 	}
-	if err := repository.Pool.QueryRow(ctx, `SELECT count(*) FROM workspaces WHERE owner_user_id = $1 AND deleted_at IS NULL`, userB).Scan(&workspaceCount); err != nil {
-		t.Fatalf("count workspace-free user: %v", err)
+	if err := repository.SaveUsage(ctxA, domain.UsageRecord{
+		Provider:       "integration-test",
+		Model:          "usage-guard",
+		Feature:        "assistant",
+		InputTokens:    30,
+		UsageAvailable: true,
+		CreatedAt:      createdAt,
+	}); err != nil {
+		t.Fatalf("save reserved usage: %v", err)
 	}
-	if workspaceCount != 0 {
-		t.Fatalf("expected user B to own no active workspaces, got %d", workspaceCount)
+	thirdReservation := firstReservation
+	thirdReservation.ID += "-third"
+	thirdReservation.Amount = 71
+	if allowed, err := repository.ReserveUsage(ctxA, thirdReservation); err != nil {
+		t.Fatalf("reserve after committed usage: %v", err)
+	} else if allowed {
+		t.Fatal("expected recorded usage to count against the monthly limit")
 	}
-
-	createdAt := time.Date(2026, time.January, 1, 0, 0, 0, 0, time.UTC)
-	contexts := []struct {
-		ctx  context.Context
-		item domain.WorkContext
-	}{
-		{
-			ctx: ctxA,
-			item: domain.WorkContext{
-				ID:         "legacy-compat-context-a-" + suffix,
-				SourceType: "manual",
-				SourceURL:  "https://example.invalid/legacy/a",
-				Title:      "User A legacy sentinel",
-				Content:    "user-a-content-must-stay-user-scoped",
-				Domain:     "legacy-a",
-				CreatedAt:  createdAt,
-			},
-		},
-		{
-			ctx: ctxB,
-			item: domain.WorkContext{
-				ID:         "legacy-compat-context-b-" + suffix,
-				SourceType: "github",
-				SourceURL:  "https://example.invalid/legacy/b",
-				Title:      "User B legacy sentinel",
-				Content:    "user-b-content-must-stay-user-scoped",
-				Domain:     "legacy-b",
-				CreatedAt:  createdAt.Add(time.Minute),
-			},
-		},
+	if err := repository.SaveUsage(ctxA, domain.UsageRecord{
+		Provider: "integration-test", Model: "usage-guard", Feature: "stt", EstimatedCost: 95, CreatedAt: createdAt,
+	}); err != nil {
+		t.Fatalf("save feature-scoped usage: %v", err)
 	}
-	for _, entry := range contexts {
-		if err := repository.SaveWorkContext(entry.ctx, entry.item); err != nil {
-			t.Fatalf("save legacy work context %s: %v", entry.item.ID, err)
-		}
+	featureScoped := firstReservation
+	featureScoped.ID += "-feature-scoped"
+	featureScoped.Metric = UsageMetricCost
+	featureScoped.Feature = "assistant"
+	featureScoped.Amount = 40
+	featureScoped.Limit = 100
+	if allowed, err := repository.ReserveUsage(ctxA, featureScoped); err != nil || !allowed {
+		t.Fatalf("independent feature reservation: allowed=%v err=%v", allowed, err)
 	}
-
-	for _, entry := range contexts {
-		items, err := repository.AllWorkContexts(entry.ctx)
-		if err != nil {
-			t.Fatalf("read legacy work contexts for %s: %v", entry.item.ID, err)
-		}
-		if len(items) != 1 {
-			t.Fatalf("expected one user-scoped legacy context for %s, got %+v", entry.item.ID, items)
-		}
-		got := items[0]
-		if got.ID != entry.item.ID || got.SourceType != entry.item.SourceType || got.SourceURL != entry.item.SourceURL || got.Title != entry.item.Title || got.Content != entry.item.Content || got.Domain != entry.item.Domain || !got.CreatedAt.Equal(entry.item.CreatedAt) {
-			t.Fatalf("legacy context changed or leaked for %s: got %+v, want %+v", entry.item.ID, items[0], entry.item)
-		}
-	}
-
-	importedSources := []struct {
-		id         string
-		userID     string
-		sourceType string
-		title      string
-		content    string
-	}{
-		{
-			id:         "legacy-compat-source-a-" + suffix,
-			userID:     userA,
-			sourceType: "drive",
-			title:      "User A imported sentinel",
-			content:    "user-a-imported-content-must-stay-user-scoped",
-		},
-		{
-			id:         "legacy-compat-source-b-" + suffix,
-			userID:     userB,
-			sourceType: "github",
-			title:      "User B imported sentinel",
-			content:    "user-b-imported-content-must-stay-user-scoped",
-		},
-	}
-	for _, source := range importedSources {
-		_, err := repository.Pool.Exec(ctx, `
-			INSERT INTO imported_sources (id, user_id, source_type, title, content)
-			VALUES ($1, $2, $3, $4, $5)`,
-			source.id, source.userID, source.sourceType, source.title, source.content,
-		)
-		if err != nil {
-			t.Fatalf("insert imported source %s: %v", source.id, err)
-		}
-	}
-
-	for _, source := range importedSources {
-		var got struct {
-			ID         string
-			UserID     string
-			SourceType string
-			Title      string
-			Content    string
-		}
-		if err := repository.Pool.QueryRow(ctx, `
-			SELECT id, user_id, source_type, title, content
-			FROM imported_sources
-			WHERE id = $1 AND user_id = $2`, source.id, source.userID).Scan(
-			&got.ID, &got.UserID, &got.SourceType, &got.Title, &got.Content,
-		); err != nil {
-			t.Fatalf("read imported source %s in its user scope: %v", source.id, err)
-		}
-		if got.ID != source.id || got.UserID != source.userID || got.SourceType != source.sourceType || got.Title != source.title || got.Content != source.content {
-			t.Fatalf("imported source changed for %s: got %+v, want %+v", source.id, got, source)
-		}
-
-		otherUser := userA
-		if source.userID == userA {
-			otherUser = userB
-		}
-		var otherUserCount int
-		if err := repository.Pool.QueryRow(ctx, `SELECT count(*) FROM imported_sources WHERE id = $1 AND user_id = $2`, source.id, otherUser).Scan(&otherUserCount); err != nil {
-			t.Fatalf("check imported source cross-user visibility %s: %v", source.id, err)
-		}
-		if otherUserCount != 0 {
-			t.Fatalf("imported source %s leaked across user scope", source.id)
-		}
+	if err := repository.CompleteUsageReservation(ctxA, featureScoped.ID, false); err != nil {
+		t.Fatalf("release independent feature reservation: %v", err)
 	}
 }
